@@ -49,6 +49,14 @@ class EnvironmentVariables {
 
   @IsBoolean()
   MYSQL_LOGGING: boolean = false;
+
+  @IsString()
+  @IsNotEmpty()
+  JWT_SECRET!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  JWT_EXPIRES_IN!: string;
 }
 
 function normaliseBoolean(value: unknown, defaultValue: boolean): boolean {
@@ -109,6 +117,8 @@ export function validateEnv(config: Record<string, unknown>): Env {
     MYSQL_PASSWORD: validated.MYSQL_PASSWORD,
     MYSQL_DATABASE: validated.MYSQL_DATABASE,
     MYSQL_LOGGING: validated.MYSQL_LOGGING,
+    JWT_SECRET: validated.JWT_SECRET,
+    JWT_EXPIRES_IN: validated.JWT_EXPIRES_IN,
   };
 }
 

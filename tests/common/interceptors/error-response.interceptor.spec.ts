@@ -1,6 +1,6 @@
 import type { CallHandler, ExecutionContext } from '@nestjs/common';
 import { HttpException, HttpStatus, InternalServerErrorException } from '@nestjs/common';
-import { lastValueFrom, of, throwError } from 'rxjs';
+import { lastValueFrom, throwError } from 'rxjs';
 import { ErrorResponseInterceptor } from '../../../src/common/interceptors/error-response.interceptor';
 
 describe('ErrorResponseInterceptor', () => {

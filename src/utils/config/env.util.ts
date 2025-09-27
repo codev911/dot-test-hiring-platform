@@ -18,5 +18,7 @@ export function collectEnv(configService: ConfigService<Env>): Env {
     MYSQL_PASSWORD: configService.getOrThrow<string>('MYSQL_PASSWORD'),
     MYSQL_DATABASE: configService.getOrThrow<string>('MYSQL_DATABASE'),
     MYSQL_LOGGING: configService.get<boolean>('MYSQL_LOGGING') ?? false,
+    JWT_SECRET: configService.getOrThrow<string>('JWT_SECRET'),
+    JWT_EXPIRES_IN: configService.getOrThrow<string>('JWT_EXPIRES_IN'),
   };
 }

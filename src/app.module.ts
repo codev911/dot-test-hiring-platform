@@ -12,6 +12,7 @@ import { RATE_LIMIT } from './utils/constants/rate-limit.constant';
 import type { Env } from './utils/types/env.type';
 import { ErrorResponseInterceptor } from './common/interceptors/error-response.interceptor';
 import { SuccessResponseInterceptor } from './common/interceptors/success-response.interceptor';
+import { AuthModule } from './auth/auth.module';
 
 /**
  * Root NestJS module that wires together controllers and providers for the application runtime.
@@ -45,6 +46,7 @@ import { SuccessResponseInterceptor } from './common/interceptors/success-respon
     ThrottlerModule.forRoot({
       throttlers: [RATE_LIMIT],
     }),
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [

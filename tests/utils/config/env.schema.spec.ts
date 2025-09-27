@@ -8,6 +8,8 @@ describe('validateEnv', () => {
     MYSQL_USER: 'root',
     MYSQL_PASSWORD: 'password',
     MYSQL_DATABASE: 'test_db',
+    JWT_SECRET: 'secret',
+    JWT_EXPIRES_IN: '1h',
   };
 
   it('returns defaults for optional values and coercions for supplied ones', () => {
@@ -25,6 +27,8 @@ describe('validateEnv', () => {
       MYSQL_PASSWORD: 'password',
       MYSQL_DATABASE: 'test_db',
       MYSQL_LOGGING: false,
+      JWT_SECRET: 'secret',
+      JWT_EXPIRES_IN: '1h',
     });
   });
 
@@ -38,6 +42,8 @@ describe('validateEnv', () => {
       MYSQL_PASSWORD: 'admin_pw',
       MYSQL_DATABASE: 'prod_db',
       MYSQL_LOGGING: 'true',
+      JWT_SECRET: 'jwt-secret',
+      JWT_EXPIRES_IN: '2h',
     });
 
     expect(result).toEqual({
@@ -49,6 +55,8 @@ describe('validateEnv', () => {
       MYSQL_PASSWORD: 'admin_pw',
       MYSQL_DATABASE: 'prod_db',
       MYSQL_LOGGING: true,
+      JWT_SECRET: 'jwt-secret',
+      JWT_EXPIRES_IN: '2h',
     });
   });
 
@@ -63,6 +71,8 @@ describe('validateEnv', () => {
         MYSQL_PASSWORD: '',
         MYSQL_DATABASE: '',
         MYSQL_LOGGING: 'not-boolean',
+        JWT_SECRET: '',
+        JWT_EXPIRES_IN: '',
       }),
     ).toThrow(/Invalid environment variables/);
   });
@@ -82,6 +92,8 @@ describe('validateEnv', () => {
       MYSQL_PASSWORD: 'config-password',
       MYSQL_DATABASE: 'config-db',
       MYSQL_LOGGING: 'false',
+      JWT_SECRET: 'config-jwt',
+      JWT_EXPIRES_IN: '3h',
     });
 
     expect(result).toEqual({
@@ -93,6 +105,8 @@ describe('validateEnv', () => {
       MYSQL_PASSWORD: 'config-password',
       MYSQL_DATABASE: 'config-db',
       MYSQL_LOGGING: false,
+      JWT_SECRET: 'config-jwt',
+      JWT_EXPIRES_IN: '3h',
     });
   });
 });

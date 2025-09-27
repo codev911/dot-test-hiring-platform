@@ -9,4 +9,6 @@ export type Env = {
   MYSQL_PASSWORD: string;
   MYSQL_DATABASE: string;
   MYSQL_LOGGING: boolean;
+  JWT_SECRET: string;
+  JWT_EXPIRES_IN: string;
 };

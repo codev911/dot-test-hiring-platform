@@ -14,6 +14,8 @@ describe('collectEnv', () => {
       MYSQL_PASSWORD: 'db-pass',
       MYSQL_DATABASE: 'db-name',
       MYSQL_LOGGING: true,
+      JWT_SECRET: 'jwt-secret',
+      JWT_EXPIRES_IN: '1h',
     };
 
     const getOrThrow = jest.fn((key: string) => {

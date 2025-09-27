@@ -25,7 +25,8 @@
     "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js -d src/database/typeorm.database.ts",
     "migration:generate": "yarn typeorm migration:generate src/database/migrations/$NAME",
     "migration:run": "yarn typeorm migration:run",
-    "migration:revert": "yarn typeorm migration:revert"
+    "migration:revert": "yarn typeorm migration:revert",
+    "seed:owner": "ts-node -r tsconfig-paths/register src/database/seeds/seed-owner.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.896.0",

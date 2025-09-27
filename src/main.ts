@@ -34,6 +34,16 @@ async function bootstrap(): Promise<void> {
         'HTTP API for managing recruiters, companies, jobs, and candidate applications.',
       )
       .setVersion('1.0.0')
+      .addBearerAuth(
+        {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          description:
+            'Include `Authorization: Bearer <token>` header returned from login endpoints.',
+        },
+        'bearer',
+      )
       .build();
     const documentFactory = (): OpenAPIObject => SwaggerModule.createDocument(app, config);
     SwaggerModule.setup('swagger', app, documentFactory);

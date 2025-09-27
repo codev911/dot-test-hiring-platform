@@ -29,9 +29,11 @@ async function bootstrap(): Promise<void> {
   // enable swagger when is not production mode
   if (NODE_ENV !== NodeEnv.Production) {
     const config = new DocumentBuilder()
-      .setTitle('Cats example')
-      .setDescription('The cats API description')
-      .setVersion('1.0')
+      .setTitle('Hiring Platform API')
+      .setDescription(
+        'HTTP API for managing recruiters, companies, jobs, and candidate applications.',
+      )
+      .setVersion('1.0.0')
       .build();
     const documentFactory = (): OpenAPIObject => SwaggerModule.createDocument(app, config);
     SwaggerModule.setup('swagger', app, documentFactory);

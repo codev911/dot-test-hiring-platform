@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule, type TypeOrmModuleOptions } from '@nestjs/typeorm';
@@ -10,6 +10,8 @@ import { collectEnv } from './utils/config/env.util';
 import { configModuleOptions } from './utils/config/env.schema';
 import { RATE_LIMIT } from './utils/constants/rate-limit.constant';
 import type { Env } from './utils/types/env.type';
+import { ErrorResponseInterceptor } from './common/interceptors/error-response.interceptor';
+import { SuccessResponseInterceptor } from './common/interceptors/success-response.interceptor';
 
 /**
  * Root NestJS module that wires together controllers and providers for the application runtime.
@@ -47,10 +49,20 @@ import type { Env } from './utils/types/env.type';
   controllers: [AppController],
   providers: [
     AppService,
+    SuccessResponseInterceptor,
+    ErrorResponseInterceptor,
     // using ThrottlerGuard to enable rate limit at AppController
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useExisting: SuccessResponseInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useExisting: ErrorResponseInterceptor,
     },
   ],
 })

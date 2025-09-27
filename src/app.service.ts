@@ -11,6 +11,6 @@ export class AppService {
    * @returns Friendly greeting for API consumers.
    */
   getHello(): string {
-    return 'Hello World!';
+    return 'Service is live!';
   }
 }

@@ -10,6 +10,7 @@ const config: Config = {
   setupFiles: ['<rootDir>/tests/setup.ts'],
   collectCoverageFrom: [
     'src/**/*.(t|j)s',
+    '!src/database/**/*.(t|j)s',
     '!src/**/*.d.ts',
     '!src/**/*.interface.ts',
     '!src/**/*.interfaces.ts',

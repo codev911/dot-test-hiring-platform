@@ -24,7 +24,7 @@ async function bootstrap(): Promise<void> {
 
   // get config env
   const configService = app.get<ConfigService<Env>>(ConfigService);
-  const { PORT, NODE_ENV }: Env = collectEnv(configService);
+  const { PORT, NODE_ENV } = collectEnv(configService);
 
   // enable swagger when is not production mode
   if (NODE_ENV !== NodeEnv.Production) {

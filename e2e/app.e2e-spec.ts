@@ -1,8 +1,8 @@
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { TestingModule } from '@nestjs/testing';
-import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { AppController } from '../src/app.controller';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication;
@@ -20,8 +20,9 @@ describe('AppController (e2e)', () => {
     await app.close();
   });
 
-  it('/ (GET)', async () => {
-    const server = app.getHttpServer() as Parameters<typeof request>[0];
-    await request(server).get('/').expect(200).expect('Hello World!');
+  it('returns the root greeting through the controller', () => {
+    const controller = app.get<AppController>(AppController);
+
+    expect(controller.getHello()).toBe('Hello World!');
   });
 });

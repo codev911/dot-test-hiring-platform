@@ -1,6 +1,16 @@
 import type { ConfigModuleOptions } from '@nestjs/config';
 import { plainToInstance } from 'class-transformer';
-import { IsEnum, IsInt, Max, Min, validateSync, type ValidationError } from 'class-validator';
+import {
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsNotEmpty,
+  IsString,
+  Max,
+  Min,
+  validateSync,
+  type ValidationError,
+} from 'class-validator';
 import { NodeEnv } from '../enums/node-env.enum';
 import type { Env } from '../types/env.type';
 
@@ -15,6 +25,49 @@ class EnvironmentVariables {
   @Min(0)
   @Max(65535)
   PORT: number = 3000;
+
+  @IsString()
+  @IsNotEmpty()
+  MYSQL_HOST!: string;
+
+  @IsInt()
+  @Min(0)
+  @Max(65535)
+  MYSQL_PORT!: number;
+
+  @IsString()
+  @IsNotEmpty()
+  MYSQL_USER!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  MYSQL_PASSWORD!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  MYSQL_DATABASE!: string;
+
+  @IsBoolean()
+  MYSQL_LOGGING: boolean = false;
+}
+
+function normaliseBoolean(value: unknown, defaultValue: boolean): boolean {
+  if (typeof value === 'string') {
+    const normalised = value.trim().toLowerCase();
+    if (['true', '1', 'yes', 'y', 'on'].includes(normalised)) {
+      return true;
+    }
+
+    if (['false', '0', 'no', 'n', 'off'].includes(normalised)) {
+      return false;
+    }
+  }
+
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  return defaultValue;
 }
 
 /**
@@ -28,6 +81,8 @@ export function validateEnv(config: Record<string, unknown>): Env {
     enableImplicitConversion: true,
     exposeDefaultValues: true,
   });
+
+  validated.MYSQL_LOGGING = normaliseBoolean(config.MYSQL_LOGGING, validated.MYSQL_LOGGING);
 
   const errors: ValidationError[] = validateSync(validated, {
     skipMissingProperties: false,
@@ -48,6 +103,12 @@ export function validateEnv(config: Record<string, unknown>): Env {
   return {
     NODE_ENV: validated.NODE_ENV,
     PORT: validated.PORT,
+    MYSQL_HOST: validated.MYSQL_HOST,
+    MYSQL_PORT: validated.MYSQL_PORT,
+    MYSQL_USER: validated.MYSQL_USER,
+    MYSQL_PASSWORD: validated.MYSQL_PASSWORD,
+    MYSQL_DATABASE: validated.MYSQL_DATABASE,
+    MYSQL_LOGGING: validated.MYSQL_LOGGING,
   };
 }
 

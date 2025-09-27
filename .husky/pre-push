@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+npm run build || exit 1
+npm run test:cov || exit 1
+npm run test:e2e || exit 1

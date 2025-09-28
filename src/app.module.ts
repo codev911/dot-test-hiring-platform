@@ -19,6 +19,8 @@ import { UserResumeModule } from './user-resume/user-resume.module';
 import { UserSitesModule } from './user-sites/user-sites.module';
 import { UserSkillModule } from './user-skill/user-skill.module';
 import { UserModule } from './user/user.module';
+import { JobPostingModule } from './job-posting/job-posting.module';
+import { JobApplicationModule } from './job-application/job-application.module';
 import { configModuleOptions } from './utils/config/env.schema';
 import { collectEnv } from './utils/config/env.util';
 import { RATE_LIMIT } from './utils/constants/rate-limit.constant';
@@ -81,6 +83,8 @@ import type { Env } from './utils/types/env.type';
     UserExperienceModule,
     UserCertificationModule,
     UserSitesModule,
+    JobPostingModule,
+    JobApplicationModule,
   ],
   controllers: [AppController],
   providers: [

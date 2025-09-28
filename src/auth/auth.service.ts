@@ -157,10 +157,15 @@ export class AuthService {
       throw new ForbiddenException('User is not registered as a recruiter.');
     }
 
-    const tokenPayload = await this.buildAuthPayload(user, 'recruiter', {
-      companyId: recruiterRecord.companyId,
-      recuiterLevel: recruiterRecord.recuiterLevel,
-    });
+    const tokenPayload = await this.buildAuthPayload(
+      user,
+      'recruiter',
+      {
+        companyId: recruiterRecord.companyId,
+        recuiterLevel: recruiterRecord.recuiterLevel,
+      },
+      recruiterRecord.id,
+    );
 
     return {
       message: 'Login successful.',
@@ -174,12 +179,14 @@ export class AuthService {
    * @param user Persisted user entity representing the account.
    * @param role Indicates whether the session belongs to a candidate or recruiter.
    * @param recruiterMetadata Optional recruiter details to embed in the payload.
+   * @param companyRecruiterId Optional company recruiter mapping ID.
    * @returns Auth token payload consumed by controllers.
    */
   private async buildAuthPayload(
     user: User,
     role: 'candidate' | 'recruiter',
     recruiterMetadata?: { companyId: string; recuiterLevel: RecuiterLevel },
+    companyRecruiterId?: string,
   ): Promise<AuthTokenPayload> {
     const sanitized = this.sanitizeUser(user);
 
@@ -190,6 +197,7 @@ export class AuthService {
       email: sanitized.email,
       role,
       ...(extendedPayload ?? {}),
+      ...(companyRecruiterId ? { companyRecruiterId } : {}),
     });
 
     const authPayload: AuthTokenPayload = {

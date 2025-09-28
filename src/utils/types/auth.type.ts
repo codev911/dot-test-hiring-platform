@@ -34,6 +34,7 @@ export type JwtPayload = {
     companyId: string;
     recuiterLevel: RecuiterLevel;
   };
+  companyRecruiterId?: string;
 };
 
 /**

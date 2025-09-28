@@ -68,3 +68,32 @@ export type PaginatedUserEducationsData = {
   limit: number;
   totalPage: number;
 };
+
+/**
+ * Shape describing user experience information returned to clients.
+ */
+export type UserExperienceData = {
+  id: string;
+  title: string;
+  company: string;
+  type: string;
+  location: string;
+  fromMonth?: string;
+  fromYear?: number;
+  toMonth?: string;
+  toYear?: number;
+  description?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+};
+
+/**
+ * Paginated response for user experiences.
+ */
+export type PaginatedUserExperiencesData = {
+  data: UserExperienceData[];
+  totalData: number;
+  page: number;
+  limit: number;
+  totalPage: number;
+};

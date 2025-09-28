@@ -62,6 +62,9 @@ describe('JobPostingService', () => {
           provide: CacheHelperService,
           useValue: {
             getOrSet: jest.fn((_k: string, supplier: any) => supplier()),
+            rememberList: jest.fn((_idx: string, _k: string, supplier: any) => supplier()),
+            trackKey: jest.fn(),
+            invalidateIndex: jest.fn(),
             del: jest.fn(),
           },
         },

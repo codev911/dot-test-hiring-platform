@@ -28,6 +28,8 @@ import {
 } from '@nestjs/swagger';
 import { CacheTTL } from '@nestjs/cache-manager';
 import { JobPostingService } from './job-posting.service';
+import { CacheHelperService } from '../utils/cache/cache.service';
+import { buildCacheKey, buildHttpCacheKeyForUserPath } from '../utils/cache/cache.util';
 import { CreateJobPostingDto } from './dto/create-job-posting.dto';
 import { UpdateJobPostingDto } from './dto/update-job-posting.dto';
 import {
@@ -72,7 +74,10 @@ export class JobPostingController {
   /**
    * @param jobPostingService Service orchestrating job posting operations.
    */
-  constructor(private readonly jobPostingService: JobPostingService) {}
+  constructor(
+    private readonly jobPostingService: JobPostingService,
+    private readonly cache: CacheHelperService,
+  ) {}
 
   /**
    * Create a new job posting (recruiter only).
@@ -142,6 +147,22 @@ export class JobPostingController {
       pageNum,
       limitNum,
     );
+
+    // Track recruiter HTTP cache key for this listing
+    const httpKey = buildHttpCacheKeyForUserPath(request.user.sub, '/job-posting/listing', {
+      page: pageNum,
+      limit: limitNum,
+    });
+    const httpIndexKey = buildCacheKey(
+      'idx',
+      'http',
+      'jobs',
+      'recruiter',
+      'list',
+      request.user.companyRecruiterId,
+    );
+    await this.cache.trackKey(httpIndexKey, httpKey);
+
     return { message: 'Job postings retrieved successfully.', data: result };
   }
 
@@ -174,6 +195,19 @@ export class JobPostingController {
       request.user.companyRecruiterId!,
       jobId,
     );
+
+    // Track recruiter HTTP cache key for this detail
+    const httpKey = buildHttpCacheKeyForUserPath(request.user.sub, `/job-posting/listing/${jobId}`);
+    const httpIndexKey = buildCacheKey(
+      'idx',
+      'http',
+      'jobs',
+      'recruiter',
+      'detail',
+      request.user.companyRecruiterId,
+    );
+    await this.cache.trackKey(httpIndexKey, httpKey);
+
     return { message: 'Job posting retrieved successfully.', data: jobPosting };
   }
 

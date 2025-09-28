@@ -33,7 +33,10 @@ describe('JobApplicationController', () => {
       getApplicationNotes: jest.fn(),
       getApplicationEvents: jest.fn(),
     } as unknown as jest.Mocked<JobApplicationService>;
-    controller = new JobApplicationController(service);
+    controller = new JobApplicationController(
+      service as unknown as any,
+      { trackKey: jest.fn() } as any,
+    );
   });
 
   afterEach(() => jest.clearAllMocks());

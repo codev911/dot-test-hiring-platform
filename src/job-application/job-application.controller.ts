@@ -27,6 +27,8 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import type { Request as ExpressRequest } from 'express';
+import { CacheHelperService } from '../utils/cache/cache.service';
+import { buildCacheKey, buildHttpCacheKeyForUserPath } from '../utils/cache/cache.util';
 import { CandidateAuthGuard } from '../common/guards/candidate-auth.guard';
 import { RecruiterAuthGuard } from '../common/guards/recruiter-auth.guard';
 import type { JwtPayload } from '../utils/types/auth.type';
@@ -58,7 +60,10 @@ export class JobApplicationController {
   /**
    * @param jobApplicationService Service orchestrating job application operations.
    */
-  constructor(private readonly jobApplicationService: JobApplicationService) {}
+  constructor(
+    private readonly jobApplicationService: JobApplicationService,
+    private readonly cache: CacheHelperService,
+  ) {}
 
   /**
    * Create a new job application (candidate only).
@@ -243,6 +248,28 @@ export class JobApplicationController {
       pageNum,
       limitNum,
     );
+
+    // Track recruiter HTTP cache key for this job applications listing
+    const httpKey = buildHttpCacheKeyForUserPath(
+      request.user.sub,
+      `/job-application/job/${jobId}`,
+      {
+        page: pageNum,
+        limit: limitNum,
+      },
+    );
+    const httpIndexKey = buildCacheKey(
+      'idx',
+      'http',
+      'job-application',
+      'recruiter',
+      'job',
+      'list',
+      request.user.companyRecruiterId,
+      jobId,
+    );
+    await this.cache.trackKey(httpIndexKey, httpKey);
+
     return { message: 'Job applications retrieved successfully.', data: result };
   }
 
@@ -275,6 +302,22 @@ export class JobApplicationController {
       request.user.companyRecruiterId!,
       applicationId,
     );
+
+    // Track recruiter HTTP cache key for this detail
+    const httpKey = buildHttpCacheKeyForUserPath(
+      request.user.sub,
+      `/job-application/${applicationId}`,
+    );
+    const httpIndexKey = buildCacheKey(
+      'idx',
+      'http',
+      'job-application',
+      'recruiter',
+      'detail',
+      request.user.companyRecruiterId,
+    );
+    await this.cache.trackKey(httpIndexKey, httpKey);
+
     return { message: 'Job application retrieved successfully.', data: application };
   }
 

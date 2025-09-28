@@ -27,6 +27,8 @@ import type {
 } from '../utils/types/job.type';
 import { ApplicationStatus } from '../utils/enums/application-status.enum';
 import { withTransaction } from '../utils/database/transaction.util';
+import { CacheHelperService } from '../utils/cache/cache.service';
+import { buildCacheKey, buildHttpCacheKeyForUserPath } from '../utils/cache/cache.util';
 
 /**
  * Business logic for job application operations.
@@ -57,6 +59,7 @@ export class JobApplicationService {
     private readonly jobApplicationNoteRepository: Repository<JobApplicationNote>,
     @InjectRepository(CompanyRecruiter)
     private readonly companyRecruiterRepository: Repository<CompanyRecruiter>,
+    private readonly cache: CacheHelperService,
     @Optional() private readonly dataSource?: DataSource,
   ) {}
 
@@ -137,6 +140,48 @@ export class JobApplicationService {
       return savedApplication;
     });
 
+    // Invalidate candidate caches (list + detail + HTTP index/base)
+    await this.cache.del(
+      buildCacheKey('job-application', 'candidate', 'detail', candidateId, saved.id),
+    );
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'job-application', 'candidate', 'list', candidateId),
+    );
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'job-application', 'candidate', 'list', candidateId),
+    );
+    await this.cache.del(
+      buildHttpCacheKeyForUserPath(candidateId, '/job-application/my-applications'),
+    );
+
+    // Invalidate recruiter job applications list index
+    const posting = await this.jobPostingRepository.findOne({ where: { id: dto.jobId } });
+    if (posting) {
+      await this.cache.invalidateIndex(
+        buildCacheKey(
+          'idx',
+          'job-application',
+          'recruiter',
+          'job',
+          'list',
+          posting.recruiterId,
+          dto.jobId,
+        ),
+      );
+      await this.cache.invalidateIndex(
+        buildCacheKey(
+          'idx',
+          'http',
+          'job-application',
+          'recruiter',
+          'job',
+          'list',
+          posting.recruiterId,
+          dto.jobId,
+        ),
+      );
+    }
+
     return this.toJobApplicationData(saved);
   }
 
@@ -153,26 +198,49 @@ export class JobApplicationService {
     page: number = 1,
     limit: number = 10,
   ): Promise<PaginatedJobApplicationsData> {
-    const skip = (page - 1) * limit;
-
-    const [applications, totalData] = await this.jobApplicationRepository.findAndCount({
-      where: { candidateId },
-      relations: ['job', 'job.company', 'candidate', 'resume'],
-      skip,
-      take: limit,
-      order: { submittedAt: 'DESC' },
-    });
-
-    const data = applications.map((app) => this.toJobApplicationWithRelationsData(app));
-    const totalPage = Math.ceil(totalData / limit);
-
-    return {
-      data,
-      totalData,
+    const key = buildCacheKey('job-application', 'candidate', 'list', candidateId, page, limit);
+    const indexKey = buildCacheKey('idx', 'job-application', 'candidate', 'list', candidateId);
+    const httpIndexKey = buildCacheKey(
+      'idx',
+      'http',
+      'job-application',
+      'candidate',
+      'list',
+      candidateId,
+    );
+    const httpKey = buildHttpCacheKeyForUserPath(candidateId, '/job-application/my-applications', {
       page,
       limit,
-      totalPage,
-    };
+    });
+    const result = await this.cache.rememberList(
+      indexKey,
+      key,
+      async () => {
+        const skip = (page - 1) * limit;
+
+        const [applications, totalData] = await this.jobApplicationRepository.findAndCount({
+          where: { candidateId },
+          relations: ['job', 'job.company', 'candidate', 'resume'],
+          skip,
+          take: limit,
+          order: { submittedAt: 'DESC' },
+        });
+
+        const data = applications.map((app) => this.toJobApplicationWithRelationsData(app));
+        const totalPage = Math.ceil(totalData / limit);
+
+        return {
+          data,
+          totalData,
+          page,
+          limit,
+          totalPage,
+        };
+      },
+      300_000,
+    );
+    await this.cache.trackKey(httpIndexKey, httpKey);
+    return result;
   }
 
   /**
@@ -188,20 +256,27 @@ export class JobApplicationService {
     candidateId: string,
     applicationId: string,
   ): Promise<JobApplicationWithRelationsData> {
-    const application = await this.jobApplicationRepository.findOne({
-      where: { id: applicationId },
-      relations: ['job', 'job.company', 'candidate', 'resume'],
-    });
+    const key = buildCacheKey('job-application', 'candidate', 'detail', candidateId, applicationId);
+    return this.cache.getOrSet(
+      key,
+      async () => {
+        const application = await this.jobApplicationRepository.findOne({
+          where: { id: applicationId },
+          relations: ['job', 'job.company', 'candidate', 'resume'],
+        });
 
-    if (!application) {
-      throw new NotFoundException('Job application not found.');
-    }
+        if (!application) {
+          throw new NotFoundException('Job application not found.');
+        }
 
-    if (application.candidateId !== candidateId) {
-      throw new ForbiddenException('You can only access your own applications.');
-    }
+        if (application.candidateId !== candidateId) {
+          throw new ForbiddenException('You can only access your own applications.');
+        }
 
-    return this.toJobApplicationWithRelationsData(application);
+        return this.toJobApplicationWithRelationsData(application);
+      },
+      300_000,
+    );
   }
 
   /**
@@ -260,6 +335,20 @@ export class JobApplicationService {
       return savedApplication;
     });
 
+    // Invalidate candidate caches
+    await this.cache.del(
+      buildCacheKey('job-application', 'candidate', 'detail', candidateId, applicationId),
+    );
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'job-application', 'candidate', 'list', candidateId),
+    );
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'job-application', 'candidate', 'list', candidateId),
+    );
+    await this.cache.del(
+      buildHttpCacheKeyForUserPath(candidateId, '/job-application/my-applications'),
+    );
+
     return this.toJobApplicationData(saved);
   }
 
@@ -292,26 +381,53 @@ export class JobApplicationService {
       throw new ForbiddenException('You can only access applications for your own job postings.');
     }
 
-    const skip = (page - 1) * limit;
-
-    const [applications, totalData] = await this.jobApplicationRepository.findAndCount({
-      where: { jobId },
-      relations: ['job', 'job.company', 'candidate', 'resume'],
-      skip,
-      take: limit,
-      order: { submittedAt: 'DESC' },
-    });
-
-    const data = applications.map((app) => this.toJobApplicationWithRelationsData(app));
-    const totalPage = Math.ceil(totalData / limit);
-
-    return {
-      data,
-      totalData,
+    const key = buildCacheKey(
+      'job-application',
+      'recruiter',
+      'job',
+      'list',
+      companyRecruiterId,
+      jobId,
       page,
       limit,
-      totalPage,
-    };
+    );
+    const indexKey = buildCacheKey(
+      'idx',
+      'job-application',
+      'recruiter',
+      'job',
+      'list',
+      companyRecruiterId,
+      jobId,
+    );
+
+    return this.cache.rememberList(
+      indexKey,
+      key,
+      async () => {
+        const skip = (page - 1) * limit;
+
+        const [applications, totalData] = await this.jobApplicationRepository.findAndCount({
+          where: { jobId },
+          relations: ['job', 'job.company', 'candidate', 'resume'],
+          skip,
+          take: limit,
+          order: { submittedAt: 'DESC' },
+        });
+
+        const data = applications.map((app) => this.toJobApplicationWithRelationsData(app));
+        const totalPage = Math.ceil(totalData / limit);
+
+        return {
+          data,
+          totalData,
+          page,
+          limit,
+          totalPage,
+        };
+      },
+      300_000,
+    );
   }
 
   /**
@@ -327,20 +443,35 @@ export class JobApplicationService {
     companyRecruiterId: string,
     applicationId: string,
   ): Promise<JobApplicationWithRelationsData> {
-    const application = await this.jobApplicationRepository.findOne({
-      where: { id: applicationId },
-      relations: ['job', 'job.company', 'candidate', 'resume'],
-    });
+    const key = buildCacheKey(
+      'job-application',
+      'recruiter',
+      'detail',
+      companyRecruiterId,
+      applicationId,
+    );
+    return this.cache.getOrSet(
+      key,
+      async () => {
+        const application = await this.jobApplicationRepository.findOne({
+          where: { id: applicationId },
+          relations: ['job', 'job.company', 'candidate', 'resume'],
+        });
 
-    if (!application) {
-      throw new NotFoundException('Job application not found.');
-    }
+        if (!application) {
+          throw new NotFoundException('Job application not found.');
+        }
 
-    if (application.job.recruiterId !== companyRecruiterId) {
-      throw new ForbiddenException('You can only access applications for your own job postings.');
-    }
+        if (application.job.recruiterId !== companyRecruiterId) {
+          throw new ForbiddenException(
+            'You can only access applications for your own job postings.',
+          );
+        }
 
-    return this.toJobApplicationWithRelationsData(application);
+        return this.toJobApplicationWithRelationsData(application);
+      },
+      300_000,
+    );
   }
 
   /**
@@ -393,6 +524,57 @@ export class JobApplicationService {
       return savedEvent;
     });
 
+    // Invalidate recruiter detail and list for the job
+    await this.cache.del(
+      buildCacheKey('job-application', 'recruiter', 'detail', companyRecruiterId, applicationId),
+    );
+    await this.cache.invalidateIndex(
+      buildCacheKey(
+        'idx',
+        'job-application',
+        'recruiter',
+        'job',
+        'list',
+        companyRecruiterId,
+        application.job.id,
+      ),
+    );
+    await this.cache.invalidateIndex(
+      buildCacheKey(
+        'idx',
+        'http',
+        'job-application',
+        'recruiter',
+        'job',
+        'list',
+        companyRecruiterId,
+        application.job.id,
+      ),
+    );
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'job-application', 'recruiter', 'detail', companyRecruiterId),
+    );
+
+    // Invalidate candidate caches
+    await this.cache.del(
+      buildCacheKey(
+        'job-application',
+        'candidate',
+        'detail',
+        application.candidateId,
+        applicationId,
+      ),
+    );
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'job-application', 'candidate', 'list', application.candidateId),
+    );
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'job-application', 'candidate', 'list', application.candidateId),
+    );
+    await this.cache.del(
+      buildHttpCacheKeyForUserPath(application.candidateId, '/job-application/my-applications'),
+    );
+
     return this.toJobApplicationEventData(saved);
   }
 
@@ -421,23 +603,47 @@ export class JobApplicationService {
     }
 
     if (application.job.recruiterId !== companyRecruiterId) {
-      throw new ForbiddenException(
-        'You can only add notes to applications for your own job postings.',
-      );
+      throw new ForbiddenException('You can only update applications for your own job postings.');
     }
 
+    // Create note
     const note = this.jobApplicationNoteRepository.create({
       applicationId,
-      authorRecruiterId: companyRecruiterId,
       note: dto.note,
     });
+    const saved = await this.jobApplicationNoteRepository.save(note);
 
-    const saved = await withTransaction(this.dataSource, async (em?: EntityManager) => {
-      const repo = em ? em.getRepository(JobApplicationNote) : this.jobApplicationNoteRepository;
-      return repo.save(note);
-    });
+    // Invalidate recruiter detail and job list
+    await this.cache.del(
+      buildCacheKey('job-application', 'recruiter', 'detail', companyRecruiterId, applicationId),
+    );
+    await this.cache.invalidateIndex(
+      buildCacheKey(
+        'idx',
+        'job-application',
+        'recruiter',
+        'job',
+        'list',
+        companyRecruiterId,
+        application.job.id,
+      ),
+    );
+    await this.cache.invalidateIndex(
+      buildCacheKey(
+        'idx',
+        'http',
+        'job-application',
+        'recruiter',
+        'job',
+        'list',
+        companyRecruiterId,
+        application.job.id,
+      ),
+    );
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'job-application', 'recruiter', 'detail', companyRecruiterId),
+    );
 
-    // Load the note with author details
     const noteWithAuthor = await this.jobApplicationNoteRepository.findOne({
       where: { id: saved.id },
       relations: ['author', 'author.recruiterIdRel'],

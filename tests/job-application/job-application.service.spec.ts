@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { CacheHelperService } from '../../src/utils/cache/cache.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
 import { JobApplicationService } from '../../src/job-application/job-application.service';
@@ -64,6 +65,16 @@ describe('JobApplicationService', () => {
             findAndCount: jest.fn(),
             create: jest.fn(),
             save: jest.fn(),
+          },
+        },
+        {
+          provide: CacheHelperService,
+          useValue: {
+            getOrSet: jest.fn((_k: string, s: any) => s()),
+            rememberList: jest.fn((_idx: string, _k: string, s: any) => s()),
+            trackKey: jest.fn(),
+            invalidateIndex: jest.fn(),
+            del: jest.fn(),
           },
         },
         { provide: getRepositoryToken(JobPosting), useValue: { findOne: jest.fn() } },

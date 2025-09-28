@@ -48,7 +48,10 @@ describe('JobPostingController', () => {
       updateJobSkill: jest.fn(),
       deleteJobSkill: jest.fn(),
     } as unknown as jest.Mocked<JobPostingService>;
-    controller = new JobPostingController(service);
+    controller = new JobPostingController(
+      service as unknown as any,
+      { trackKey: jest.fn() } as any,
+    );
   });
 
   afterEach(() => jest.clearAllMocks());

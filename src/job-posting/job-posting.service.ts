@@ -1,29 +1,31 @@
-import { Injectable, NotFoundException, Optional, ForbiddenException } from '@nestjs/common';
-import { CacheHelperService } from '../utils/cache/cache.service';
-import { buildCacheKey } from '../utils/cache/cache.util';
+import { ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import type { Repository, EntityManager, DataSource } from 'typeorm';
-import { JobPosting } from '../entities/job-posting.entity';
-import { Company } from '../entities/company.entity';
+import type { DataSource, EntityManager, Repository } from 'typeorm';
 import { CompanyRecruiter } from '../entities/company-recruiter.entity';
+import { Company } from '../entities/company.entity';
 import { JobBenefit } from '../entities/job-benefit.entity';
+import { JobPosting } from '../entities/job-posting.entity';
 import { JobRequirement } from '../entities/job-requirement.entity';
 import { JobSkill } from '../entities/job-skill.entity';
-import type { CreateJobPostingDto } from './dto/create-job-posting.dto';
-import type { UpdateJobPostingDto } from './dto/update-job-posting.dto';
+import { CacheHelperService } from '../utils/cache/cache.service';
+import { buildCacheKey, buildHttpCacheKeyForUserPath } from '../utils/cache/cache.util';
+import { withTransaction } from '../utils/database/transaction.util';
 import type {
+  JobBenefitData,
   JobPostingData,
   JobPostingWithCompanyData,
-  PaginatedJobPostingsData,
+  JobRequirementData,
   JobSearchFilters,
+  JobSkillData,
+  PaginatedJobPostingsData,
 } from '../utils/types/job.type';
-import { withTransaction } from '../utils/database/transaction.util';
-import type { JobBenefitData, JobRequirementData, JobSkillData } from '../utils/types/job.type';
 import type { CreateJobBenefitDto } from './dto/create-job-benefit.dto';
-import type { UpdateJobBenefitDto } from './dto/update-job-benefit.dto';
+import type { CreateJobPostingDto } from './dto/create-job-posting.dto';
 import type { CreateJobRequirementDto } from './dto/create-job-requirement.dto';
-import type { UpdateJobRequirementDto } from './dto/update-job-requirement.dto';
 import type { CreateJobSkillDto } from './dto/create-job-skill.dto';
+import type { UpdateJobBenefitDto } from './dto/update-job-benefit.dto';
+import type { UpdateJobPostingDto } from './dto/update-job-posting.dto';
+import type { UpdateJobRequirementDto } from './dto/update-job-requirement.dto';
 import type { UpdateJobSkillDto } from './dto/update-job-skill.dto';
 
 /**
@@ -98,9 +100,17 @@ export class JobPostingService {
       return repo.save(jobPosting);
     });
 
-    // Invalidate detail caches (by id and slug) so public reads refresh
+    // Invalidate caches affected by new posting
     await this.cache.del(buildCacheKey('jobs', 'public', 'detail', saved.id));
     await this.cache.del(buildCacheKey('jobs', 'public', 'detail', saved.slug));
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'jobs', 'public', 'list'));
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'http', 'jobs', 'public', 'list'));
+    // Also clear base HTTP key (no query params) for public listing
+    await this.cache.del(buildHttpCacheKeyForUserPath(undefined, '/job-posting/public'));
+    // Invalidate recruiter listing
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'jobs', 'recruiter', 'list', companyRecruiterId),
+    );
 
     return this.toJobPostingData(saved);
   }
@@ -118,26 +128,35 @@ export class JobPostingService {
     page: number = 1,
     limit: number = 10,
   ): Promise<PaginatedJobPostingsData> {
-    const skip = (page - 1) * limit;
+    const key = buildCacheKey('jobs', 'recruiter', 'list', companyRecruiterId, page, limit);
+    const indexKey = buildCacheKey('idx', 'jobs', 'recruiter', 'list', companyRecruiterId);
+    return await this.cache.rememberList(
+      indexKey,
+      key,
+      async () => {
+        const skip = (page - 1) * limit;
 
-    const [jobPostings, totalData] = await this.jobPostingRepository.findAndCount({
-      where: { recruiterId: companyRecruiterId },
-      relations: ['company'],
-      skip,
-      take: limit,
-      order: { createdAt: 'DESC' },
-    });
+        const [jobPostings, totalData] = await this.jobPostingRepository.findAndCount({
+          where: { recruiterId: companyRecruiterId },
+          relations: ['company'],
+          skip,
+          take: limit,
+          order: { createdAt: 'DESC' },
+        });
 
-    const data = jobPostings.map((job) => this.toJobPostingWithCompanyData(job));
-    const totalPage = Math.ceil(totalData / limit);
+        const data = jobPostings.map((job) => this.toJobPostingWithCompanyData(job));
+        const totalPage = Math.ceil(totalData / limit);
 
-    return {
-      data,
-      totalData,
-      page,
-      limit,
-      totalPage,
-    };
+        return {
+          data,
+          totalData,
+          page,
+          limit,
+          totalPage,
+        };
+      },
+      300_000,
+    );
   }
 
   /**
@@ -153,58 +172,65 @@ export class JobPostingService {
     companyRecruiterId: string,
     jobId: string,
   ): Promise<JobPostingWithCompanyData> {
-    const jobPosting = await this.jobPostingRepository.findOne({
-      where: { id: jobId },
-      relations: ['company'],
-    });
+    const key = buildCacheKey('jobs', 'recruiter', 'detail', companyRecruiterId, jobId);
+    return this.cache.getOrSet(
+      key,
+      async () => {
+        const jobPosting = await this.jobPostingRepository.findOne({
+          where: { id: jobId },
+          relations: ['company'],
+        });
 
-    if (!jobPosting) {
-      throw new NotFoundException('Job posting not found.');
-    }
+        if (!jobPosting) {
+          throw new NotFoundException('Job posting not found.');
+        }
 
-    if (jobPosting.recruiterId !== companyRecruiterId) {
-      throw new ForbiddenException('You can only access your own job postings.');
-    }
+        if (jobPosting.recruiterId !== companyRecruiterId) {
+          throw new ForbiddenException('You can only access your own job postings.');
+        }
 
-    const [benefits, requirements, skills] = await Promise.all([
-      this.jobBenefitRepository.find({ where: { jobId } }),
-      this.jobRequirementRepository.find({ where: { jobId } }),
-      this.jobSkillRepository.find({ where: { jobId } }),
-    ]);
+        const [benefits, requirements, skills] = await Promise.all([
+          this.jobBenefitRepository.find({ where: { jobId } }),
+          this.jobRequirementRepository.find({ where: { jobId } }),
+          this.jobSkillRepository.find({ where: { jobId } }),
+        ]);
 
-    return {
-      ...this.toJobPostingData(jobPosting),
-      company: {
-        id: jobPosting.company.id,
-        name: jobPosting.company.name,
-        description: jobPosting.company.description ?? undefined,
+        return {
+          ...this.toJobPostingData(jobPosting),
+          company: {
+            id: jobPosting.company.id,
+            name: jobPosting.company.name,
+            description: jobPosting.company.description ?? undefined,
+          },
+          benefits: benefits.map((benefit) => ({
+            id: benefit.id,
+            jobId: benefit.jobId,
+            label: benefit.label,
+            description: benefit.description ?? undefined,
+            createdAt: benefit.createdAt!,
+            updatedAt: benefit.updatedAt!,
+          })),
+          requirements: requirements.map((req) => ({
+            id: req.id,
+            jobId: req.jobId,
+            label: req.label,
+            detail: req.detail ?? undefined,
+            createdAt: req.createdAt!,
+            updatedAt: req.updatedAt!,
+          })),
+          skills: skills.map((skill) => ({
+            id: skill.id,
+            jobId: skill.jobId,
+            skillName: skill.skillName,
+            priority: skill.priority,
+            proficiency: skill.proficiency,
+            createdAt: skill.createdAt!,
+            updatedAt: skill.updatedAt!,
+          })),
+        };
       },
-      benefits: benefits.map((benefit) => ({
-        id: benefit.id,
-        jobId: benefit.jobId,
-        label: benefit.label,
-        description: benefit.description ?? undefined,
-        createdAt: benefit.createdAt!,
-        updatedAt: benefit.updatedAt!,
-      })),
-      requirements: requirements.map((req) => ({
-        id: req.id,
-        jobId: req.jobId,
-        label: req.label,
-        detail: req.detail ?? undefined,
-        createdAt: req.createdAt!,
-        updatedAt: req.updatedAt!,
-      })),
-      skills: skills.map((skill) => ({
-        id: skill.id,
-        jobId: skill.jobId,
-        skillName: skill.skillName,
-        priority: skill.priority,
-        proficiency: skill.proficiency,
-        createdAt: skill.createdAt!,
-        updatedAt: skill.updatedAt!,
-      })),
-    };
+      300_000,
+    );
   }
 
   /**
@@ -251,9 +277,23 @@ export class JobPostingService {
       return repo.save(jobPosting);
     });
 
-    // Invalidate affected caches (detail by id and slug). Listings will naturally expire shortly.
+    // Invalidate affected caches (detail by id and slug) and public listings
     await this.cache.del(buildCacheKey('jobs', 'public', 'detail', saved.id));
     await this.cache.del(buildCacheKey('jobs', 'public', 'detail', saved.slug));
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'jobs', 'public', 'list'));
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'http', 'jobs', 'public', 'list'));
+    await this.cache.del(buildHttpCacheKeyForUserPath(undefined, '/job-posting/public'));
+    // Invalidate recruiter caches for this recruiter (service + HTTP indices)
+    await this.cache.del(buildCacheKey('jobs', 'recruiter', 'detail', companyRecruiterId, jobId));
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'jobs', 'recruiter', 'list', companyRecruiterId),
+    );
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'jobs', 'recruiter', 'list', companyRecruiterId),
+    );
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'jobs', 'recruiter', 'detail', companyRecruiterId),
+    );
 
     return this.toJobPostingData(saved);
   }
@@ -284,9 +324,22 @@ export class JobPostingService {
       await repo.remove(jobPosting);
     });
 
-    // Invalidate detail caches (by id and slug)
+    // Invalidate caches
     await this.cache.del(buildCacheKey('jobs', 'public', 'detail', jobId));
     await this.cache.del(buildCacheKey('jobs', 'public', 'detail', jobPosting.slug));
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'jobs', 'public', 'list'));
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'http', 'jobs', 'public', 'list'));
+    await this.cache.del(buildHttpCacheKeyForUserPath(undefined, '/job-posting/public'));
+    await this.cache.del(buildCacheKey('jobs', 'recruiter', 'detail', companyRecruiterId, jobId));
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'jobs', 'recruiter', 'list', companyRecruiterId),
+    );
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'jobs', 'recruiter', 'list', companyRecruiterId),
+    );
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'jobs', 'recruiter', 'detail', companyRecruiterId),
+    );
   }
 
   /**
@@ -319,7 +372,24 @@ export class JobPostingService {
       limit,
     );
 
-    return this.cache.getOrSet<PaginatedJobPostingsData>(
+    const indexKey = buildCacheKey('idx', 'jobs', 'public', 'list');
+    const httpIndexKey = buildCacheKey('idx', 'http', 'jobs', 'public', 'list');
+    const httpKey = buildHttpCacheKeyForUserPath(undefined, '/job-posting/public', {
+      query: filters.query,
+      location: filters.location,
+      employmentType: filters.employmentType,
+      workLocationType: filters.workLocationType,
+      salaryMin: filters.salaryMin,
+      salaryMax: filters.salaryMax,
+      salaryCurrency: filters.salaryCurrency,
+      companyId: filters.companyId,
+      skills: filters.skills?.join(','),
+      page,
+      limit,
+    });
+
+    const result = await this.cache.rememberList(
+      indexKey,
       key,
       async () => {
         const skip = (page - 1) * limit;
@@ -431,6 +501,8 @@ export class JobPostingService {
       },
       60_000,
     ); // 60s TTL for listing
+    await this.cache.trackKey(httpIndexKey, httpKey);
+    return result;
   }
 
   /**
@@ -619,6 +691,16 @@ export class JobPostingService {
       return repo.save(benefit);
     });
 
+    // Invalidate caches affected (public listings and detail; recruiter detail)
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'jobs', 'public', 'list'));
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'http', 'jobs', 'public', 'list'));
+    await this.cache.del(buildHttpCacheKeyForUserPath(undefined, '/job-posting/public'));
+    await this.cache.del(buildCacheKey('jobs', 'public', 'detail', jobId));
+    await this.cache.del(buildCacheKey('jobs', 'recruiter', 'detail', companyRecruiterId, jobId));
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'jobs', 'recruiter', 'detail', companyRecruiterId),
+    );
+
     return {
       id: saved.id,
       jobId: saved.jobId,
@@ -649,6 +731,9 @@ export class JobPostingService {
       where: { jobId },
       order: { createdAt: 'DESC' },
     });
+
+    // Invalidate recruiter detail cache (list read not cached), public detail not impacted by read
+    await this.cache.del(buildCacheKey('jobs', 'recruiter', 'detail', companyRecruiterId, jobId));
 
     return benefits.map((benefit) => ({
       id: benefit.id,
@@ -690,6 +775,16 @@ export class JobPostingService {
       return repo.save(benefit);
     });
 
+    // Invalidate dependent caches
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'jobs', 'public', 'list'));
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'http', 'jobs', 'public', 'list'));
+    await this.cache.del(buildHttpCacheKeyForUserPath(undefined, '/job-posting/public'));
+    await this.cache.del(buildCacheKey('jobs', 'public', 'detail', jobId));
+    await this.cache.del(buildCacheKey('jobs', 'recruiter', 'detail', companyRecruiterId, jobId));
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'jobs', 'recruiter', 'detail', companyRecruiterId),
+    );
+
     return {
       id: saved.id,
       jobId: saved.jobId,
@@ -725,6 +820,16 @@ export class JobPostingService {
       const repo = em ? em.getRepository(JobBenefit) : this.jobBenefitRepository;
       await repo.remove(benefit);
     });
+
+    // Invalidate dependent caches
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'jobs', 'public', 'list'));
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'http', 'jobs', 'public', 'list'));
+    await this.cache.del(buildHttpCacheKeyForUserPath(undefined, '/job-posting/public'));
+    await this.cache.del(buildCacheKey('jobs', 'public', 'detail', jobId));
+    await this.cache.del(buildCacheKey('jobs', 'recruiter', 'detail', companyRecruiterId, jobId));
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'jobs', 'recruiter', 'detail', companyRecruiterId),
+    );
   }
 
   // ===== JOB REQUIREMENT MANAGEMENT =====
@@ -760,6 +865,13 @@ export class JobPostingService {
       return repo.save(requirement);
     });
 
+    // Invalidate dependent caches
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'jobs', 'public', 'list'));
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'http', 'jobs', 'public', 'list'));
+    await this.cache.del(buildHttpCacheKeyForUserPath(undefined, '/job-posting/public'));
+    await this.cache.del(buildCacheKey('jobs', 'public', 'detail', jobId));
+    await this.cache.del(buildCacheKey('jobs', 'recruiter', 'detail', companyRecruiterId, jobId));
+
     return {
       id: saved.id,
       jobId: saved.jobId,
@@ -793,6 +905,8 @@ export class JobPostingService {
       where: { jobId },
       order: { createdAt: 'DESC' },
     });
+
+    await this.cache.del(buildCacheKey('jobs', 'recruiter', 'detail', companyRecruiterId, jobId));
 
     return requirements.map((req) => ({
       id: req.id,
@@ -834,6 +948,12 @@ export class JobPostingService {
       return repo.save(requirement);
     });
 
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'jobs', 'public', 'list'));
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'http', 'jobs', 'public', 'list'));
+    await this.cache.del(buildHttpCacheKeyForUserPath(undefined, '/job-posting/public'));
+    await this.cache.del(buildCacheKey('jobs', 'public', 'detail', jobId));
+    await this.cache.del(buildCacheKey('jobs', 'recruiter', 'detail', companyRecruiterId, jobId));
+
     return {
       id: saved.id,
       jobId: saved.jobId,
@@ -869,6 +989,15 @@ export class JobPostingService {
       const repo = em ? em.getRepository(JobRequirement) : this.jobRequirementRepository;
       await repo.remove(requirement);
     });
+
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'jobs', 'public', 'list'));
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'http', 'jobs', 'public', 'list'));
+    await this.cache.del(buildHttpCacheKeyForUserPath(undefined, '/job-posting/public'));
+    await this.cache.del(buildCacheKey('jobs', 'public', 'detail', jobId));
+    await this.cache.del(buildCacheKey('jobs', 'recruiter', 'detail', companyRecruiterId, jobId));
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'jobs', 'recruiter', 'detail', companyRecruiterId),
+    );
   }
 
   // ===== JOB SKILL MANAGEMENT =====
@@ -905,6 +1034,12 @@ export class JobPostingService {
       return repo.save(skill);
     });
 
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'jobs', 'public', 'list'));
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'http', 'jobs', 'public', 'list'));
+    await this.cache.del(buildHttpCacheKeyForUserPath(undefined, '/job-posting/public'));
+    await this.cache.del(buildCacheKey('jobs', 'public', 'detail', jobId));
+    await this.cache.del(buildCacheKey('jobs', 'recruiter', 'detail', companyRecruiterId, jobId));
+
     return {
       id: saved.id,
       jobId: saved.jobId,
@@ -936,6 +1071,8 @@ export class JobPostingService {
       where: { jobId },
       order: { createdAt: 'DESC' },
     });
+
+    await this.cache.del(buildCacheKey('jobs', 'recruiter', 'detail', companyRecruiterId, jobId));
 
     return skills.map((skill) => ({
       id: skill.id,
@@ -979,6 +1116,12 @@ export class JobPostingService {
       return repo.save(skill);
     });
 
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'jobs', 'public', 'list'));
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'http', 'jobs', 'public', 'list'));
+    await this.cache.del(buildHttpCacheKeyForUserPath(undefined, '/job-posting/public'));
+    await this.cache.del(buildCacheKey('jobs', 'public', 'detail', jobId));
+    await this.cache.del(buildCacheKey('jobs', 'recruiter', 'detail', companyRecruiterId, jobId));
+
     return {
       id: saved.id,
       jobId: saved.jobId,
@@ -1011,5 +1154,14 @@ export class JobPostingService {
       const repo = em ? em.getRepository(JobSkill) : this.jobSkillRepository;
       await repo.remove(skill);
     });
+
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'jobs', 'public', 'list'));
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'http', 'jobs', 'public', 'list'));
+    await this.cache.del(buildHttpCacheKeyForUserPath(undefined, '/job-posting/public'));
+    await this.cache.del(buildCacheKey('jobs', 'public', 'detail', jobId));
+    await this.cache.del(buildCacheKey('jobs', 'recruiter', 'detail', companyRecruiterId, jobId));
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'jobs', 'recruiter', 'detail', companyRecruiterId),
+    );
   }
 }

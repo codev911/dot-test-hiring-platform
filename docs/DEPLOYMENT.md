@@ -764,7 +764,7 @@ http {
         }
 
         location /health {
-            proxy_pass http://app/health;
+            proxy_pass http://app/;
         }
     }
 }
@@ -885,11 +885,14 @@ curl -f http://localhost:9000/minio/health/live
 
 ### 4. Automated Health Monitoring
 
-**Using docker-compose healthchecks:**
+**Using compose healthchecks:**
 
 ```bash
-# View health status
-docker-compose ps
+# View health status with Podman (recommended)
+podman compose ps
+
+# View health status with Docker (alternative)
+docker compose ps
 
 # Format: SERVICE   IMAGE     COMMAND   CREATED   STATUS
 # mysql     mysql:8.0  ...      Up       healthy
@@ -951,8 +954,13 @@ podman system migrate
 # Check MySQL is accepting connections
 mysql -h localhost -u root -p -e "SELECT 1;"
 
-# Reset MySQL password
-docker-compose exec mysql mysql -u root -p
+# Reset MySQL password with Podman (recommended)
+podman compose exec mysql mysql -u root -p
+ALTER USER 'root'@'localhost' IDENTIFIED BY 'new_password';
+FLUSH PRIVILEGES;
+
+# Reset MySQL password with Docker (alternative)
+docker compose exec mysql mysql -u root -p
 ALTER USER 'root'@'localhost' IDENTIFIED BY 'new_password';
 FLUSH PRIVILEGES;
 ```
@@ -961,13 +969,24 @@ FLUSH PRIVILEGES;
 
 ```bash
 # Reset database (DANGER: deletes all data)
-docker-compose down -v
-docker-compose up -d mysql redis minio
+# With Podman (recommended)
+podman compose down -v
+podman compose up -d mysql redis minio
+sleep 30
+yarn migration:run
+
+# With Docker (alternative)
+docker compose down -v
+docker compose up -d mysql redis minio
 sleep 30
 yarn migration:run
 
 # Manual migration run
-docker-compose exec app yarn migration:run
+# With Podman
+podman compose exec app yarn migration:run
+
+# With Docker
+docker compose exec app yarn migration:run
 ```
 
 ### 2. Performance Issues
@@ -1006,14 +1025,25 @@ podman system prune -a
 
 ```bash
 # View all logs
-docker-compose logs -f
+# With Podman (recommended)
+podman compose logs -f
+
+# With Docker (alternative)
+docker compose logs -f
 
 # Filter by service
-docker-compose logs -f app
-docker-compose logs -f mysql --tail=100
+# With Podman
+podman compose logs -f app
+podman compose logs -f mysql --tail=100
+
+# With Docker
+docker compose logs -f app
+docker compose logs -f mysql --tail=100
 
 # Search logs
-docker-compose logs app | grep ERROR
+podman compose logs app | grep ERROR
+# or
+docker compose logs app | grep ERROR
 ```
 
 **Application debugging:**
@@ -1033,20 +1063,35 @@ export MYSQL_LOGGING=true
 
 ```bash
 # Inspect network
+# With Podman (recommended)
+podman network ls
+podman network inspect hiring-platform_default
+
+# With Docker (alternative)
 docker network ls
 docker network inspect hiring-platform_default
 
 # Test connectivity between containers
-docker-compose exec app ping mysql
-docker-compose exec app ping redis
+# With Podman
+podman compose exec app ping mysql
+podman compose exec app ping redis
+
+# With Docker
+docker compose exec app ping mysql
+docker compose exec app ping redis
 ```
 
 **DNS resolution:**
 
 ```bash
 # Check if containers can resolve each other
-docker-compose exec app nslookup mysql
-docker-compose exec app nslookup redis
+# With Podman (recommended)
+podman compose exec app nslookup mysql
+podman compose exec app nslookup redis
+
+# With Docker (alternative)
+docker compose exec app nslookup mysql
+docker compose exec app nslookup redis
 ```
 
 ### 5. Quick Recovery Commands
@@ -1055,8 +1100,16 @@ docker-compose exec app nslookup redis
 
 ```bash
 # Full restart with fresh data
-docker-compose down -v
-docker-compose up -d
+# With Podman (recommended)
+podman compose down -v
+podman compose up -d
+sleep 30
+yarn migration:run
+yarn seed:owner
+
+# With Docker (alternative)
+docker compose down -v
+docker compose up -d
 sleep 30
 yarn migration:run
 yarn seed:owner
@@ -1066,17 +1119,32 @@ yarn seed:owner
 
 ```bash
 # Restart only app
-docker-compose restart app
+# With Podman (recommended)
+podman compose restart app
+
+# With Docker (alternative)
+docker compose restart app
 
 # Restart and rebuild app
-docker-compose up -d --build app
+# With Podman
+podman compose up -d --build app
+
+# With Docker
+docker compose up -d --build app
 ```
 
 **Emergency cleanup:**
 
 ```bash
 # Stop everything and clean up
-docker-compose down -v
+# With Podman (recommended)
+podman compose down -v
+podman system prune -a
+podman volume prune
+podman network prune
+
+# With Docker (alternative)
+docker compose down -v
 docker system prune -a
 docker volume prune
 docker network prune

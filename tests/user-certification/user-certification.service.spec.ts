@@ -74,7 +74,13 @@ describe('UserCertificationService', () => {
         UserCertificationService,
         {
           provide: CacheHelperService,
-          useValue: { getOrSet: jest.fn((_k: string, s: any) => s()), del: jest.fn() },
+          useValue: {
+            getOrSet: jest.fn((_k: string, s: any) => s()),
+            del: jest.fn(),
+            rememberList: jest.fn((_idx: string, _k: string, s: any) => s()),
+            trackKey: jest.fn(),
+            invalidateIndex: jest.fn(),
+          },
         },
         {
           provide: getRepositoryToken(User),
@@ -356,7 +362,8 @@ describe('UserCertificationService', () => {
   describe('uploadCertificate', () => {
     it('uploads certificate successfully', async () => {
       const certification = makeMockUserCertification({ certificatePath: undefined });
-      const newKey = 'certificate/user-1/aws-certified-solutions-architect-1234567890.pdf';
+      const newKey =
+        'certificate/user-1/certification-1-aws-certified-solutions-architect-1234567890.pdf';
 
       userCertificationRepository.findOne.mockResolvedValue(certification);
       userCertificationRepository.save.mockResolvedValue({
@@ -397,7 +404,8 @@ describe('UserCertificationService', () => {
 
     it('replaces existing certificate', async () => {
       const certification = makeMockUserCertification();
-      const newKey = 'certificate/user-1/aws-certified-solutions-architect-1234567890.pdf';
+      const newKey =
+        'certificate/user-1/certification-1-aws-certified-solutions-architect-1234567890.pdf';
 
       userCertificationRepository.findOne.mockResolvedValue(certification);
       userCertificationRepository.save.mockResolvedValue({
@@ -436,7 +444,8 @@ describe('UserCertificationService', () => {
 
     it('continues with upload when old certificate deletion fails', async () => {
       const certification = makeMockUserCertification();
-      const newKey = 'certificate/user-1/aws-certified-solutions-architect-1234567890.pdf';
+      const newKey =
+        'certificate/user-1/certification-1-aws-certified-solutions-architect-1234567890.pdf';
       const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
 
       userCertificationRepository.findOne.mockResolvedValue(certification);

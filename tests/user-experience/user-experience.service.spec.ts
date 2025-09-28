@@ -60,7 +60,13 @@ describe('UserExperienceService', () => {
         UserExperienceService,
         {
           provide: CacheHelperService,
-          useValue: { getOrSet: jest.fn((_k: string, s: any) => s()), del: jest.fn() },
+          useValue: {
+            getOrSet: jest.fn((_k: string, s: any) => s()),
+            del: jest.fn(),
+            rememberList: jest.fn((_idx: string, _k: string, s: any) => s()),
+            trackKey: jest.fn(),
+            invalidateIndex: jest.fn(),
+          },
         },
         {
           provide: getRepositoryToken(User),

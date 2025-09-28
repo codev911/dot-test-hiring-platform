@@ -54,8 +54,8 @@ export class UserSkillService {
       const repo = em ? em.getRepository(UserSkill) : this.userSkillRepository;
       return repo.save(userSkill);
     });
-    await this.cache.invalidateIndex(buildCacheKey('idx','user','skill','list', userId));
-    await this.cache.invalidateIndex(buildCacheKey('idx','http','user','skill','list', userId));
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'user', 'skill', 'list', userId));
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'http', 'user', 'skill', 'list', userId));
     // Also clear the base HTTP key (no query params), which might have been cached prior to index tracking
     await this.cache.del(buildHttpCacheKeyForUserPath(userId, '/user/skill'));
     return this.mapToUserSkillData(savedSkill);
@@ -158,8 +158,8 @@ export class UserSkillService {
 
     await this.cache.del(buildCacheKey('user', 'skill', 'detail', userId, id));
     await this.cache.del(buildHttpCacheKeyForUserPath(userId, `/user/skill/${id}`));
-    await this.cache.invalidateIndex(buildCacheKey('idx','user','skill','list', userId));
-    await this.cache.invalidateIndex(buildCacheKey('idx','http','user','skill','list', userId));
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'user', 'skill', 'list', userId));
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'http', 'user', 'skill', 'list', userId));
     // Also clear the base HTTP key (no query params)
     await this.cache.del(buildHttpCacheKeyForUserPath(userId, '/user/skill'));
 
@@ -190,8 +190,8 @@ export class UserSkillService {
 
     await this.cache.del(buildCacheKey('user', 'skill', 'detail', userId, id));
     await this.cache.del(buildHttpCacheKeyForUserPath(userId, `/user/skill/${id}`));
-    await this.cache.invalidateIndex(buildCacheKey('idx','user','skill','list', userId));
-    await this.cache.invalidateIndex(buildCacheKey('idx','http','user','skill','list', userId));
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'user', 'skill', 'list', userId));
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'http', 'user', 'skill', 'list', userId));
     // Also clear the base HTTP key (no query params)
     await this.cache.del(buildHttpCacheKeyForUserPath(userId, '/user/skill'));
   }

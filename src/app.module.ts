@@ -1,27 +1,28 @@
-import path from 'node:path';
 import { Module } from '@nestjs/common';
-import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { JwtModule } from '@nestjs/jwt';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule, type TypeOrmModuleOptions } from '@nestjs/typeorm';
-import { JwtModule } from '@nestjs/jwt';
+import path from 'node:path';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { collectEnv } from './utils/config/env.util';
-import { configModuleOptions } from './utils/config/env.schema';
-import { RATE_LIMIT } from './utils/constants/rate-limit.constant';
-import type { Env } from './utils/types/env.type';
+import { AuthModule } from './auth/auth.module';
 import { ErrorResponseInterceptor } from './common/interceptors/error-response.interceptor';
 import { SuccessResponseInterceptor } from './common/interceptors/success-response.interceptor';
-import { AuthModule } from './auth/auth.module';
-import { UserModule } from './user/user.module';
+import { CompanyModule } from './company/company.module';
 import { BucketModule } from './services/bucket.module';
-import { UserResumeModule } from './user-resume/user-resume.module';
-import { UserSkillModule } from './user-skill/user-skill.module';
+import { UserCertificationModule } from './user-certification/user-certification.module';
 import { UserEducationModule } from './user-education/user-education.module';
 import { UserExperienceModule } from './user-experience/user-experience.module';
-import { UserCertificationModule } from './user-certification/user-certification.module';
+import { UserResumeModule } from './user-resume/user-resume.module';
 import { UserSitesModule } from './user-sites/user-sites.module';
+import { UserSkillModule } from './user-skill/user-skill.module';
+import { UserModule } from './user/user.module';
+import { configModuleOptions } from './utils/config/env.schema';
+import { collectEnv } from './utils/config/env.util';
+import { RATE_LIMIT } from './utils/constants/rate-limit.constant';
+import type { Env } from './utils/types/env.type';
 
 /**
  * Root NestJS module that wires together controllers and providers for the application runtime.
@@ -71,8 +72,9 @@ import { UserSitesModule } from './user-sites/user-sites.module';
       throttlers: [RATE_LIMIT],
     }),
     AuthModule,
-    UserModule,
+    CompanyModule,
     BucketModule,
+    UserModule,
     UserResumeModule,
     UserSkillModule,
     UserEducationModule,

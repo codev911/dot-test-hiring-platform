@@ -1,0 +1,131 @@
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import type { Repository } from 'typeorm';
+import { Company } from '../entities/company.entity';
+import { User } from '../entities/user.entity';
+import { CompanyRecruiter } from '../entities/company-recruiter.entity';
+import type { CompanyData, RecruiterCreationData } from '../utils/types/company.type';
+import type { UpdateCompanyDto } from './dto/update-company.dto';
+import type { CreateRecruiterDto } from './dto/create-recruiter.dto';
+import { RecuiterLevel } from '../utils/enums/recuiter-level.enum';
+
+/**
+ * Business logic for company operations.
+ */
+@Injectable()
+export class CompanyService {
+  /**
+   * @param companyRepository Repository handling {@link Company} persistence.
+   * @param userRepository Repository handling {@link User} persistence.
+   * @param companyRecruiterRepository Repository for {@link CompanyRecruiter} entities.
+   */
+  constructor(
+    @InjectRepository(Company)
+    private readonly companyRepository: Repository<Company>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    @InjectRepository(CompanyRecruiter)
+    private readonly companyRecruiterRepository: Repository<CompanyRecruiter>,
+  ) {}
+
+  /**
+   * Get the statically configured company (ID 1).
+   *
+   * @returns Company projection for clients.
+   * @throws NotFoundException When the company record is missing.
+   */
+  async getStaticCompany(): Promise<CompanyData> {
+    const company = await this.companyRepository.findOne({ where: { id: '1' } });
+    if (!company) {
+      throw new NotFoundException('Company not found.');
+    }
+    return this.toCompanyData(company);
+  }
+
+  /**
+   * Update fields of the static company (ID 1).
+   *
+   * @param dto Update payload.
+   * @returns Updated company projection.
+   * @throws NotFoundException When the company record is missing.
+   */
+  async updateStaticCompany(dto: UpdateCompanyDto): Promise<CompanyData> {
+    const company = await this.companyRepository.findOne({ where: { id: '1' } });
+    if (!company) {
+      throw new NotFoundException('Company not found.');
+    }
+
+    if (dto.name !== undefined) company.name = dto.name;
+    if (dto.website !== undefined) company.website = dto.website;
+    if (dto.logoPath !== undefined) company.logoPath = dto.logoPath;
+    if (dto.description !== undefined) company.description = dto.description;
+
+    const saved = await this.companyRepository.save(company);
+    return this.toCompanyData(saved);
+  }
+
+  /**
+   * Create a new recruiter under the static company (ID 1) with manager level.
+   *
+   * @param dto Recruiter creation payload.
+   * @returns Creation metadata for the recruiter mapping and user.
+   * @throws NotFoundException When the company record is missing.
+   * @throws ConflictException When email already exists.
+   */
+  async createRecruiter(dto: CreateRecruiterDto): Promise<RecruiterCreationData> {
+    const company = await this.companyRepository.findOne({ where: { id: '1' } });
+    if (!company) {
+      throw new NotFoundException('Company not found.');
+    }
+
+    const existing = await this.userRepository.findOne({ where: { email: dto.email } });
+    if (existing) {
+      throw new ConflictException('Email is already registered.');
+    }
+    if (dto.password !== dto.confirmPassword) {
+      throw new ConflictException('Password confirmation does not match.');
+    }
+
+    const user = this.userRepository.create({
+      firstName: dto.firstName,
+      lastName: dto.lastName,
+      email: dto.email,
+      password: dto.password,
+    });
+    const savedUser = await this.userRepository.save(user);
+
+    const mapping = this.companyRecruiterRepository.create({
+      companyId: company.id,
+      recruiterId: savedUser.id,
+      recuiterLevel: RecuiterLevel.MANAGER,
+      is_active: true,
+    });
+    const savedMapping = await this.companyRecruiterRepository.save(mapping);
+
+    return {
+      userId: savedUser.id,
+      companyRecruiterId: savedMapping.id,
+      email: savedUser.email,
+      recuiterLevel: savedMapping.recuiterLevel,
+      companyId: company.id,
+    };
+  }
+
+  /**
+   * Map entity to public company projection.
+   *
+   * @param entity Company entity.
+   * @returns CompanyData projection.
+   */
+  private toCompanyData(entity: Company): CompanyData {
+    return {
+      id: entity.id,
+      name: entity.name,
+      website: entity.website ?? undefined,
+      logoPath: entity.logoPath ?? undefined,
+      description: entity.description ?? undefined,
+      createdAt: entity.createdAt,
+      updatedAt: entity.updatedAt,
+    };
+  }
+}

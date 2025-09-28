@@ -12,12 +12,8 @@ import {
   ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import {
-  AuthService,
-  type AuthTokenPayload,
-  type AuthProfilePayload,
-  type JwtPayload,
-} from './auth.service';
+import { AuthService } from './auth.service';
+import type { AuthTokenPayload, AuthProfilePayload, JwtPayload } from '../utils/types/auth.type';
 import { RegisterUserDto } from './dto/register-user.dto';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';

@@ -11,43 +11,13 @@ import { User } from '../entities/user.entity';
 import { CompanyRecruiter } from '../entities/company-recruiter.entity';
 import { RegisterUserDto } from './dto/register-user.dto';
 import { LoginDto } from './dto/login.dto';
+import {
+  type AuthenticatedUser,
+  type AuthTokenPayload,
+  type JwtPayload,
+  type AuthProfilePayload,
+} from '../utils/types/auth.type';
 import type { RecuiterLevel } from '../utils/enums/recuiter-level.enum';
-
-export type AuthenticatedUser = {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName?: string;
-};
-
-export type AuthTokenPayload = {
-  accessToken: string;
-  user: AuthenticatedUser;
-  role: 'candidate' | 'recruiter';
-  recruiter?: {
-    companyId: string;
-    recuiterLevel: RecuiterLevel;
-  };
-};
-
-export type JwtPayload = {
-  sub: string;
-  email: string;
-  role: 'candidate' | 'recruiter';
-  recruiter?: {
-    companyId: string;
-    recuiterLevel: RecuiterLevel;
-  };
-};
-
-export type AuthProfilePayload = {
-  user: AuthenticatedUser;
-  role: 'candidate' | 'recruiter';
-  recruiter?: {
-    companyId: string;
-    recuiterLevel: RecuiterLevel;
-  };
-};
 
 @Injectable()
 export class AuthService {

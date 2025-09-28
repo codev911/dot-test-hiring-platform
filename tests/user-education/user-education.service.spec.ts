@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import type { Repository } from 'typeorm';
+import type { Repository, DataSource, EntityManager } from 'typeorm';
 import { UserEducationService } from '../../src/user-education/user-education.service';
 import { UserEducation } from '../../src/entities/user-education.entity';
 import { User } from '../../src/entities/user.entity';
@@ -49,6 +49,7 @@ describe('UserEducationService', () => {
   let service: UserEducationService;
   let userRepository: jest.Mocked<Repository<User>>;
   let userEducationRepository: jest.Mocked<Repository<UserEducation>>;
+  let dataSource: jest.Mocked<DataSource>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({

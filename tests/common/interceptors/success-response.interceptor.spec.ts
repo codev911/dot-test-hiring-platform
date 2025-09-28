@@ -156,4 +156,35 @@ describe('SuccessResponseInterceptor', () => {
 
     expect(result).toBe(buffer);
   });
+
+  it('returns data property for non-object payloads', async () => {
+    const interceptor = new SuccessResponseInterceptor();
+    const context = createContext(HttpStatus.OK);
+    const handler = {
+      handle: () => of('string response'),
+    } as CallHandler;
+
+    const result = await lastValueFrom(interceptor.intercept(context, handler));
+
+    expect(result).toEqual({
+      statusCode: HttpStatus.OK,
+      message: 'Request processed successfully.',
+      data: 'string response',
+    });
+  });
+
+  it('returns undefined data when cloned object is empty', async () => {
+    const interceptor = new SuccessResponseInterceptor();
+    const context = createContext(HttpStatus.OK);
+    const handler = {
+      handle: () => of({ message: 'Custom message' }),
+    } as CallHandler;
+
+    const result = await lastValueFrom(interceptor.intercept(context, handler));
+
+    expect(result).toEqual({
+      statusCode: HttpStatus.OK,
+      message: 'Custom message',
+    });
+  });
 });

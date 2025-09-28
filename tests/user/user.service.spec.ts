@@ -194,4 +194,38 @@ describe('UserService', () => {
       await expect(service.getAvatar(userId)).rejects.toBeInstanceOf(NotFoundException);
     });
   });
+
+  describe('resolveExtension', () => {
+    it('returns extension from filename when present', () => {
+      const file = { originalname: 'test.jpg', mimetype: 'image/jpeg' } as Express.Multer.File;
+      const result = (service as any).resolveExtension(file);
+      expect(result).toBe('.jpg');
+    });
+
+    it('returns extension from mimetype when filename has no extension', () => {
+      const file = { originalname: 'test', mimetype: 'image/jpeg' } as Express.Multer.File;
+      const result = (service as any).resolveExtension(file);
+      expect(result).toBe('.jpg');
+    });
+
+    it('returns .png fallback when mimetype is unknown', () => {
+      const file = { originalname: 'test', mimetype: 'application/unknown' } as Express.Multer.File;
+      const result = (service as any).resolveExtension(file);
+      expect(result).toBe('.png');
+    });
+  });
+
+  describe('extensionFromMime', () => {
+    it('returns correct extension for known mimetypes', () => {
+      expect((service as any).extensionFromMime('image/jpeg')).toBe('jpg');
+      expect((service as any).extensionFromMime('image/png')).toBe('png');
+      expect((service as any).extensionFromMime('image/gif')).toBe('gif');
+      expect((service as any).extensionFromMime('image/webp')).toBe('webp');
+    });
+
+    it('returns undefined for unknown mimetypes', () => {
+      expect((service as any).extensionFromMime('application/unknown')).toBeUndefined();
+      expect((service as any).extensionFromMime('text/plain')).toBeUndefined();
+    });
+  });
 });

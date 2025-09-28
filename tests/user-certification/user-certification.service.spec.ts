@@ -428,5 +428,57 @@ describe('UserCertificationService', () => {
         service.uploadCertificate(mockUserId, mockCertificationId, mockFile),
       ).rejects.toThrow(new NotFoundException('User certification not found.'));
     });
+
+    it('continues with upload when old certificate deletion fails', async () => {
+      const certification = makeMockUserCertification();
+      const newKey = 'certificate/user-1/aws-certified-solutions-architect-1234567890.pdf';
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+
+      userCertificationRepository.findOne.mockResolvedValue(certification);
+      userCertificationRepository.save.mockResolvedValue({
+        ...certification,
+        certificatePath: newKey,
+      } as UserCertification);
+      bucketService.uploadObject.mockResolvedValue();
+      bucketService.deleteObject.mockRejectedValue(new Error('Delete failed'));
+      bucketService.getPublicUrl.mockReturnValue(`http://localhost:9000/bucket/${newKey}`);
+
+      // Mock Date.now() for predictable filename
+      const originalDateNow = Date.now;
+      Date.now = jest.fn(() => 1234567890);
+
+      const result = await service.uploadCertificate(mockUserId, mockCertificationId, mockFile);
+
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to delete old certificate file:'),
+        expect.any(Error),
+      );
+      expect(result.data.certificateUrl).toBe(`http://localhost:9000/bucket/${newKey}`);
+
+      // Restore
+      Date.now = originalDateNow;
+      consoleWarnSpy.mockRestore();
+    });
+  });
+
+  describe('remove', () => {
+    it('continues with removal when certificate file deletion fails', async () => {
+      const certification = makeMockUserCertification();
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+
+      userCertificationRepository.findOne.mockResolvedValue(certification);
+      userCertificationRepository.remove.mockResolvedValue(certification);
+      bucketService.deleteObject.mockRejectedValue(new Error('Delete failed'));
+
+      await service.remove(mockUserId, mockCertificationId);
+
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to delete certificate file:'),
+        expect.any(Error),
+      );
+      expect(userCertificationRepository.remove).toHaveBeenCalledWith(certification);
+
+      consoleWarnSpy.mockRestore();
+    });
   });
 });

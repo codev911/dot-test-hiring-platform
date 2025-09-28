@@ -91,4 +91,14 @@ describe('RecruiterOwnerGuard', () => {
     const context = mockContext({ authorization: 'Bearer valid' });
     await expect(guard.canActivate(context)).rejects.toBeInstanceOf(ForbiddenException);
   });
+
+  it('throws UnauthorizedException when token is missing from Bearer header', async () => {
+    const context = mockContext({ authorization: 'Bearer' });
+    await expect(guard.canActivate(context)).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('throws UnauthorizedException when authorization header has wrong format', async () => {
+    const context = mockContext({ authorization: 'Basic token123' });
+    await expect(guard.canActivate(context)).rejects.toBeInstanceOf(UnauthorizedException);
+  });
 });

@@ -17,6 +17,7 @@ describe('UserResumeController', () => {
   beforeEach(() => {
     service = {
       uploadResume: jest.fn(),
+      getResume: jest.fn(),
     } as unknown as jest.Mocked<UserResumeService>;
 
     controller = new UserResumeController(service);
@@ -52,5 +53,36 @@ describe('UserResumeController', () => {
     } as unknown as Express.Multer.File;
 
     expect(() => controller.uploadResume({} as never, file)).toThrow(UnauthorizedException);
+  });
+
+  describe('getResume', () => {
+    it('delegates resume retrieval to service', async () => {
+      service.getResume.mockResolvedValue({
+        message: 'Resume retrieved successfully.',
+        data: { resumeUrl: 'http://localhost:9000/bucket/resume/user-1.pdf' },
+      });
+
+      const response = await controller.getResume(request as never);
+
+      expect(service.getResume).toHaveBeenCalledWith('user-1');
+      expect(response.message).toBe('Resume retrieved successfully.');
+      expect(response.data.resumeUrl).toBe('http://localhost:9000/bucket/resume/user-1.pdf');
+    });
+
+    it('returns null resume URL when no resume exists', async () => {
+      service.getResume.mockResolvedValue({
+        message: 'Resume retrieved successfully.',
+        data: { resumeUrl: null },
+      });
+
+      const response = await controller.getResume(request as never);
+
+      expect(service.getResume).toHaveBeenCalledWith('user-1');
+      expect(response.data.resumeUrl).toBeNull();
+    });
+
+    it('throws when request lacks user payload', async () => {
+      await expect(controller.getResume({} as never)).rejects.toThrow(UnauthorizedException);
+    });
   });
 });

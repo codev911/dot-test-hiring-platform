@@ -404,4 +404,253 @@ describe('BucketService', () => {
 
     expect(url).toBe('http://localhost:9000/bucket/profile/user.png');
   });
+
+  it('uploads objects without content type', async () => {
+    const service = createService();
+
+    await service.uploadObject('foo.txt', 'body');
+
+    expect(sendMock).toHaveBeenCalledWith(expect.any(PutObjectCommand));
+    expect(sendMock.mock.calls.at(0)?.[0].input).toEqual({
+      Bucket: 'bucket',
+      Key: 'foo.txt',
+      Body: 'body',
+    });
+  });
+
+  it('handles bucket creation failure with non-access denied error', async () => {
+    const unknownError = new Error('Unknown error') as Error & {
+      $metadata?: { httpStatusCode?: number };
+    };
+    unknownError.$metadata = { httpStatusCode: 500 };
+
+    sendMock.mockImplementation((command: unknown) => {
+      if (command instanceof HeadBucketCommand) {
+        const accessDenied = new Error('Forbidden') as Error & {
+          $metadata?: { httpStatusCode?: number };
+        };
+        accessDenied.$metadata = { httpStatusCode: 403 };
+        throw accessDenied;
+      }
+
+      if (command instanceof CreateBucketCommand) {
+        throw unknownError;
+      }
+
+      return {};
+    });
+
+    const service = createService();
+
+    await expect(service.ensureBucket()).rejects.toThrow(
+      /Failed to create bucket bucket after access-denied verification response/,
+    );
+
+    const logger = (service as unknown as { logger: { error: jest.Mock } }).logger;
+    expect(logger.error).toHaveBeenCalledWith(
+      'Failed to create bucket bucket after access-denied verification response.',
+      expect.any(String),
+    );
+  });
+
+  it('handles bucket creation failure without cause when not access denied', async () => {
+    sendMock.mockImplementation((command: unknown) => {
+      if (command instanceof HeadBucketCommand) {
+        const accessDenied = new Error('Forbidden') as Error & {
+          $metadata?: { httpStatusCode?: number };
+        };
+        accessDenied.$metadata = { httpStatusCode: 403 };
+        throw accessDenied;
+      }
+
+      if (command instanceof CreateBucketCommand) {
+        throw new Error('string error');
+      }
+
+      return {};
+    });
+
+    const service = createService();
+
+    await expect(service.ensureBucket()).rejects.toThrow(
+      /Failed to create bucket bucket after access-denied verification response/,
+    );
+  });
+
+  it('handles bucket creation failure without cause when access denied by Code', async () => {
+    sendMock.mockImplementation((command: unknown) => {
+      if (command instanceof HeadBucketCommand) {
+        const accessDenied = new Error('Forbidden') as Error & {
+          $metadata?: { httpStatusCode?: number };
+        };
+        accessDenied.$metadata = { httpStatusCode: 403 };
+        throw accessDenied;
+      }
+
+      if (command instanceof CreateBucketCommand) {
+        const createError = { Code: 'AccessDenied' } as unknown;
+        throw createError;
+      }
+
+      return {};
+    });
+
+    const service = createService();
+
+    await expect(service.ensureBucket()).rejects.toThrow(
+      /MinIO access denied while creating bucket bucket/,
+    );
+  });
+
+  it('handles bucket verification failure without cause', async () => {
+    sendMock.mockImplementation((command: unknown) => {
+      if (command instanceof HeadBucketCommand) {
+        throw new Error('string error');
+      }
+      return {};
+    });
+
+    const service = createService();
+
+    await expect(service.ensureBucket()).rejects.toThrow(/Failed to verify bucket bucket/);
+  });
+
+  it('handles bucket policy fetch failure without cause', async () => {
+    sendMock.mockImplementation((command: unknown) => {
+      if (command instanceof HeadBucketCommand) {
+        return {};
+      }
+
+      if (command instanceof GetBucketPolicyCommand) {
+        throw new Error('string error');
+      }
+
+      return {};
+    });
+
+    const service = createService();
+
+    await expect(service.ensureBucket()).rejects.toThrow(
+      /Failed to fetch bucket policy for bucket/,
+    );
+  });
+
+  it('handles extract aws error with null input', () => {
+    const service = createService();
+    const result = (service as any).extractAwsError(null);
+    expect(result).toBeNull();
+  });
+
+  it('handles extract aws error with non-object input', () => {
+    const service = createService();
+    const result = (service as any).extractAwsError('string error');
+    expect(result).toBeNull();
+  });
+
+  it('handles normalise principal with AWS array containing wildcard', () => {
+    const service = createService();
+    const result = (service as any).normalisePrincipal({ AWS: ['*'] });
+    expect(result).toBe('*');
+  });
+
+  it('handles normalise principal with AWS string', () => {
+    const service = createService();
+    const result = (service as any).normalisePrincipal({ AWS: 'arn:aws:iam::123456789:user/test' });
+    expect(result).toEqual({ AWS: ['arn:aws:iam::123456789:user/test'] });
+  });
+
+  it('handles is missing policy with NoSuchBucket code', () => {
+    const error = { Code: 'NoSuchBucket' };
+    const service = createService();
+    const result = (service as any).isMissingPolicy(error);
+    expect(result).toBe(true);
+  });
+
+  it('handles serialise policy with array resources and actions', () => {
+    const service = createService();
+    const document = {
+      Version: '2012-10-17',
+      Statement: [
+        {
+          Sid: 'Test',
+          Effect: 'Allow',
+          Principal: { AWS: ['arn:aws:iam::123:user/test', 'arn:aws:iam::456:user/test2'] },
+          Action: ['s3:GetObject', 's3:PutObject'],
+          Resource: ['arn:aws:s3:::bucket/*', 'arn:aws:s3:::bucket2/*'],
+        },
+      ],
+    };
+    const result = (service as any).serialisePolicy(document);
+    expect(result).toContain('s3:GetObject');
+  });
+
+  it('removes leading slashes from public url key', () => {
+    const service = createService();
+
+    const url = service.getPublicUrl('///profile/user.png');
+
+    expect(url).toBe('http://localhost:9000/bucket/profile/user.png');
+  });
+
+  it('returns early when bucket is not ready after error handling', async () => {
+    const logSpy = jest.spyOn(console, 'log').mockImplementation();
+
+    sendMock.mockImplementation((command: unknown) => {
+      if (command instanceof HeadBucketCommand) {
+        const error = new Error('Unknown error') as Error & {
+          $metadata?: { httpStatusCode?: number };
+          Code?: string;
+        };
+        error.$metadata = { httpStatusCode: 500 };
+        error.Code = 'InternalError';
+        throw error;
+      }
+      return {};
+    });
+
+    const service = createService();
+
+    await expect(service.ensureBucket()).rejects.toThrow(/Failed to verify bucket bucket/);
+
+    logSpy.mockRestore();
+  });
+
+  it('returns early when bucket creation fails silently', async () => {
+    const bucketReady = false;
+    const ensurePublicReadAccessSpy = jest.fn();
+
+    sendMock.mockImplementation((command: unknown) => {
+      if (command instanceof HeadBucketCommand) {
+        const error = new Error('Access denied') as Error & {
+          $metadata?: { httpStatusCode?: number };
+        };
+        error.$metadata = { httpStatusCode: 403 };
+        throw error;
+      }
+
+      if (command instanceof CreateBucketCommand) {
+        // Simulate creation failure that doesn't throw but leaves bucketReady false
+        const error = new Error('Creation failed') as Error & {
+          $metadata?: { httpStatusCode?: number };
+        };
+        error.$metadata = { httpStatusCode: 500 };
+        throw error;
+      }
+
+      return {};
+    });
+
+    const service = createService();
+
+    // Spy on the ensurePublicReadAccess to see if it gets called
+    jest
+      .spyOn(service as any, 'ensurePublicReadAccess')
+      .mockImplementation(ensurePublicReadAccessSpy);
+
+    // This should trigger the access denied -> creation failure path and throw
+    await expect(service.ensureBucket()).rejects.toThrow();
+
+    // ensurePublicReadAccess should not be called because bucketReady stays false
+    expect(ensurePublicReadAccessSpy).not.toHaveBeenCalled();
+  });
 });

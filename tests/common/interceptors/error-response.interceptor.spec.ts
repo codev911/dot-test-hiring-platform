@@ -106,4 +106,71 @@ describe('ErrorResponseInterceptor', () => {
       });
     });
   });
+
+  it('handles string payload as message', async () => {
+    const interceptor = new ErrorResponseInterceptor();
+    const context = createContext();
+    const handler = {
+      handle: () =>
+        throwError(() => new HttpException('String error message', HttpStatus.BAD_REQUEST)),
+    } as CallHandler;
+
+    await lastValueFrom(interceptor.intercept(context, handler)).catch((error) => {
+      expect(error).toBeInstanceOf(HttpException);
+      expect((error as HttpException).getResponse()).toEqual({
+        statusCode: HttpStatus.BAD_REQUEST,
+        error: 'HttpException',
+        message: 'String error message',
+        details: undefined,
+      });
+    });
+  });
+
+  it('extracts message from string payload directly', () => {
+    const interceptor = new ErrorResponseInterceptor();
+    const extractMessageSpy = jest.spyOn(interceptor as any, 'extractMessage');
+
+    const result = (interceptor as any).extractMessage('Direct string message');
+
+    expect(result).toBe('Direct string message');
+    expect(extractMessageSpy).toHaveReturnedWith('Direct string message');
+
+    extractMessageSpy.mockRestore();
+  });
+
+  it('returns undefined details for non-object payload', async () => {
+    const interceptor = new ErrorResponseInterceptor();
+    const context = createContext();
+    const handler = {
+      handle: () => throwError(() => new HttpException('String error', HttpStatus.BAD_REQUEST)),
+    } as CallHandler;
+
+    await lastValueFrom(interceptor.intercept(context, handler)).catch((error) => {
+      expect(error).toBeInstanceOf(HttpException);
+      expect((error as HttpException).getResponse()).toEqual({
+        statusCode: HttpStatus.BAD_REQUEST,
+        error: 'HttpException',
+        message: 'String error',
+        details: undefined,
+      });
+    });
+  });
+
+  it('returns undefined details for null payload', async () => {
+    const interceptor = new ErrorResponseInterceptor();
+    const context = createContext();
+    const handler = {
+      handle: () => throwError(() => new HttpException(null as any, HttpStatus.BAD_REQUEST)),
+    } as CallHandler;
+
+    await lastValueFrom(interceptor.intercept(context, handler)).catch((error) => {
+      expect(error).toBeInstanceOf(HttpException);
+      expect((error as HttpException).getResponse()).toEqual({
+        statusCode: HttpStatus.BAD_REQUEST,
+        error: 'HttpException',
+        message: 'Unexpected error occurred.',
+        details: undefined,
+      });
+    });
+  });
 });

@@ -769,7 +769,7 @@ export class JobPostingService {
       return repo.save(benefit);
     });
 
-    // Invalidate caches affected (public listings and detail; recruiter detail)
+    // Invalidate caches affected (public listings and detail; recruiter listing and detail)
     await this.cache.invalidateIndex(buildCacheKey('idx', 'jobs', 'public', 'list'));
     await this.cache.invalidateIndex(buildCacheKey('idx', 'http', 'jobs', 'public', 'list'));
     await this.cache.del(buildHttpCacheKeyForUserPath(undefined, '/job-posting/public'));
@@ -777,6 +777,18 @@ export class JobPostingService {
     // Invalidate public HTTP detail index for this job
     await this.cache.invalidateIndex(
       buildCacheKey('idx', 'http', 'jobs', 'public', 'detail', jobId),
+    );
+    // Recruiter detail (service + HTTP)
+    await this.cache.del(buildCacheKey('jobs', 'recruiter', 'detail', companyRecruiterId, jobId));
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'jobs', 'recruiter', 'detail', companyRecruiterId),
+    );
+    // Recruiter listing (service + HTTP)
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'jobs', 'recruiter', 'list', companyRecruiterId),
+    );
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'jobs', 'recruiter', 'list', companyRecruiterId),
     );
     await this.cache.del(buildCacheKey('jobs', 'recruiter', 'detail', companyRecruiterId, jobId));
     await this.cache.invalidateIndex(
@@ -907,14 +919,26 @@ export class JobPostingService {
       await repo.remove(benefit);
     });
 
-    // Invalidate dependent caches
+    // Invalidate dependent caches (public + recruiter listing/detail)
     await this.cache.invalidateIndex(buildCacheKey('idx', 'jobs', 'public', 'list'));
     await this.cache.invalidateIndex(buildCacheKey('idx', 'http', 'jobs', 'public', 'list'));
     await this.cache.del(buildHttpCacheKeyForUserPath(undefined, '/job-posting/public'));
     await this.cache.del(buildCacheKey('jobs', 'public', 'detail', jobId));
+    // Public detail HTTP
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'jobs', 'public', 'detail', jobId),
+    );
+    // Recruiter detail (service + HTTP)
     await this.cache.del(buildCacheKey('jobs', 'recruiter', 'detail', companyRecruiterId, jobId));
     await this.cache.invalidateIndex(
       buildCacheKey('idx', 'http', 'jobs', 'recruiter', 'detail', companyRecruiterId),
+    );
+    // Recruiter listing (service + HTTP)
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'jobs', 'recruiter', 'list', companyRecruiterId),
+    );
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'jobs', 'recruiter', 'list', companyRecruiterId),
     );
   }
 
@@ -951,7 +975,7 @@ export class JobPostingService {
       return repo.save(requirement);
     });
 
-    // Invalidate dependent caches
+    // Invalidate dependent caches (public + recruiter listing/detail)
     await this.cache.invalidateIndex(buildCacheKey('idx', 'jobs', 'public', 'list'));
     await this.cache.invalidateIndex(buildCacheKey('idx', 'http', 'jobs', 'public', 'list'));
     await this.cache.del(buildHttpCacheKeyForUserPath(undefined, '/job-posting/public'));
@@ -960,7 +984,18 @@ export class JobPostingService {
     await this.cache.invalidateIndex(
       buildCacheKey('idx', 'http', 'jobs', 'public', 'detail', jobId),
     );
+    // Recruiter detail (service + HTTP)
     await this.cache.del(buildCacheKey('jobs', 'recruiter', 'detail', companyRecruiterId, jobId));
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'jobs', 'recruiter', 'detail', companyRecruiterId),
+    );
+    // Recruiter listing (service + HTTP)
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'jobs', 'recruiter', 'list', companyRecruiterId),
+    );
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'jobs', 'recruiter', 'list', companyRecruiterId),
+    );
 
     return {
       id: saved.id,
@@ -1042,7 +1077,22 @@ export class JobPostingService {
     await this.cache.invalidateIndex(buildCacheKey('idx', 'http', 'jobs', 'public', 'list'));
     await this.cache.del(buildHttpCacheKeyForUserPath(undefined, '/job-posting/public'));
     await this.cache.del(buildCacheKey('jobs', 'public', 'detail', jobId));
+    // Public detail HTTP
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'jobs', 'public', 'detail', jobId),
+    );
+    // Recruiter detail (service + HTTP)
     await this.cache.del(buildCacheKey('jobs', 'recruiter', 'detail', companyRecruiterId, jobId));
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'jobs', 'recruiter', 'detail', companyRecruiterId),
+    );
+    // Recruiter listing (service + HTTP)
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'jobs', 'recruiter', 'list', companyRecruiterId),
+    );
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'jobs', 'recruiter', 'list', companyRecruiterId),
+    );
 
     return {
       id: saved.id,
@@ -1084,7 +1134,22 @@ export class JobPostingService {
     await this.cache.invalidateIndex(buildCacheKey('idx', 'http', 'jobs', 'public', 'list'));
     await this.cache.del(buildHttpCacheKeyForUserPath(undefined, '/job-posting/public'));
     await this.cache.del(buildCacheKey('jobs', 'public', 'detail', jobId));
+    // Public detail HTTP
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'jobs', 'public', 'detail', jobId),
+    );
+    // Recruiter detail (service + HTTP)
     await this.cache.del(buildCacheKey('jobs', 'recruiter', 'detail', companyRecruiterId, jobId));
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'jobs', 'recruiter', 'detail', companyRecruiterId),
+    );
+    // Recruiter listing (service + HTTP)
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'jobs', 'recruiter', 'list', companyRecruiterId),
+    );
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'jobs', 'recruiter', 'list', companyRecruiterId),
+    );
     await this.cache.invalidateIndex(
       buildCacheKey('idx', 'http', 'jobs', 'recruiter', 'detail', companyRecruiterId),
     );
@@ -1214,7 +1279,22 @@ export class JobPostingService {
     await this.cache.invalidateIndex(buildCacheKey('idx', 'http', 'jobs', 'public', 'list'));
     await this.cache.del(buildHttpCacheKeyForUserPath(undefined, '/job-posting/public'));
     await this.cache.del(buildCacheKey('jobs', 'public', 'detail', jobId));
+    // Public detail HTTP
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'jobs', 'public', 'detail', jobId),
+    );
+    // Recruiter detail (service + HTTP)
     await this.cache.del(buildCacheKey('jobs', 'recruiter', 'detail', companyRecruiterId, jobId));
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'jobs', 'recruiter', 'detail', companyRecruiterId),
+    );
+    // Recruiter listing (service + HTTP)
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'jobs', 'recruiter', 'list', companyRecruiterId),
+    );
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'jobs', 'recruiter', 'list', companyRecruiterId),
+    );
 
     return {
       id: saved.id,
@@ -1257,9 +1337,17 @@ export class JobPostingService {
     await this.cache.invalidateIndex(
       buildCacheKey('idx', 'http', 'jobs', 'public', 'detail', jobId),
     );
+    // Recruiter detail (service + HTTP)
     await this.cache.del(buildCacheKey('jobs', 'recruiter', 'detail', companyRecruiterId, jobId));
     await this.cache.invalidateIndex(
       buildCacheKey('idx', 'http', 'jobs', 'recruiter', 'detail', companyRecruiterId),
+    );
+    // Recruiter listing (service + HTTP)
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'jobs', 'recruiter', 'list', companyRecruiterId),
+    );
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'jobs', 'recruiter', 'list', companyRecruiterId),
     );
   }
 }

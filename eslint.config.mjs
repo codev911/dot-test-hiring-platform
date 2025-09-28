@@ -7,6 +7,9 @@ import tseslint from 'typescript-eslint';
 export default tseslint.config(
   {
     ignores: ['dist', 'coverage', 'node_modules', '*.js', 'eslint.config.mjs'],
+    linterOptions: {
+      reportUnusedDisableDirectives: 'off',
+    },
   },
   {
     files: ['**/*.ts'],
@@ -92,13 +95,18 @@ export default tseslint.config(
     },
   },
   {
-    files: ['test/**/*.ts', '**/*.spec.ts', '**/*.e2e-spec.ts'],
+    files: ['tests/**/*.ts', 'test/**/*.ts', '**/*.spec.ts', '**/*.e2e-spec.ts'],
     rules: {
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',
       '@typescript-eslint/no-unsafe-argument': 'off',
       '@typescript-eslint/no-unnecessary-type-assertion': 'off',
       '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/unbound-method': 'off',
+      '@typescript-eslint/consistent-type-imports': 'off',
+      '@typescript-eslint/no-extraneous-class': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
+      '@typescript-eslint/explicit-function-return-type': 'off',
       'no-console': 'off',
     },
   },

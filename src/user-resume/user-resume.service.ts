@@ -29,6 +29,32 @@ export class UserResumeService {
   ) {}
 
   /**
+   * Get the user's resume URL if available.
+   *
+   * @param userId Identifier of the account whose resume is being retrieved.
+   * @returns Response containing the resume URL or null if no resume uploaded.
+   * @throws NotFoundException When the user cannot be located.
+   */
+  async getResume(userId: string): Promise<{ message: string; data: UserResumeData }> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+
+    if (!user) {
+      throw new NotFoundException('User not found.');
+    }
+
+    const userResume = await this.userResumeRepository.findOne({ where: { userId } });
+
+    return {
+      message: 'Resume retrieved successfully.',
+      data: {
+        resumeUrl: userResume
+          ? String(this.bucketService.getPublicUrl(userResume.resumePath))
+          : null,
+      },
+    };
+  }
+
+  /**
    * Upload or replace the user's resume in object storage and persist the new key.
    *
    * @param userId Identifier of the account whose resume is being updated.

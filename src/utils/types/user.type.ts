@@ -18,3 +18,26 @@ export type PasswordChangeData = {
 export type UserResumeData = {
   resumeUrl: string | null;
 };
+
+/**
+ * Shape describing user skill information returned to clients.
+ */
+export type UserSkillData = {
+  id: string;
+  skillName: string;
+  proficiency: string;
+  yearsExperience?: number;
+  createdAt?: Date;
+  updatedAt?: Date;
+};
+
+/**
+ * Paginated response for user skills.
+ */
+export type PaginatedUserSkillsData = {
+  data: UserSkillData[];
+  totalData: number;
+  page: number;
+  limit: number;
+  totalPage: number;
+};

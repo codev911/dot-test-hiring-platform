@@ -1,5 +1,6 @@
 import {
   Controller,
+  Get,
   Post,
   Req,
   UnauthorizedException,
@@ -41,6 +42,24 @@ export class UserResumeController {
    * @param userResumeService Service orchestrating resume activities.
    */
   constructor(private readonly userResumeService: UserResumeService) {}
+
+  /**
+   * Get the authenticated candidate's resume URL.
+   *
+   * @param request Express request used to access the JWT payload.
+   * @returns Response containing the resume URL or null if no resume uploaded.
+   */
+  @Get()
+  @ApiOkResponse({ description: 'Resume retrieved successfully.', type: ResumeResponseDto })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })
+  @ApiForbiddenResponse({ description: 'Candidate role required.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
+  async getResume(
+    @Req() request: Request & { user?: JwtPayload },
+  ): Promise<{ message: string; data: { resumeUrl: string | null } }> {
+    const userId = this.extractUserId(request);
+    return this.userResumeService.getResume(userId);
+  }
 
   /**
    * Upload or replace the authenticated candidate's resume (PDF up to 10MB).

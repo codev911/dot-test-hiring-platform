@@ -7,6 +7,9 @@ loadEnv();
 
 const env = validateEnv(process.env);
 
+/**
+ * Shared TypeORM configuration reused by the Nest module and CLI utilities.
+ */
 export const typeOrmDataSourceOptions: DataSourceOptions = {
   type: 'mysql',
   host: env.MYSQL_HOST,
@@ -22,4 +25,7 @@ export const typeOrmDataSourceOptions: DataSourceOptions = {
 };
 const appDataSource = new DataSource(typeOrmDataSourceOptions);
 
+/**
+ * Primary data source instance consumed by CLI scripts and migrations.
+ */
 export default appDataSource;

@@ -68,6 +68,11 @@ const profileExample = {
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
+  /**
+   * Inject dependencies required to orchestrate authentication flows.
+   *
+   * @param authService Service handling authentication logic.
+   */
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
@@ -84,6 +89,12 @@ export class AuthController {
   @ApiConflictResponse({ description: 'Email is already registered.' })
   @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
   @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
+  /**
+   * Register a new candidate account.
+   *
+   * @param dto Candidate registration request body.
+   * @returns Auth payload containing a JWT and sanitized user profile.
+   */
   registerCandidate(
     @Body() dto: RegisterUserDto,
   ): Promise<{ message: string; data: AuthTokenPayload }> {
@@ -104,6 +115,12 @@ export class AuthController {
   @ApiUnauthorizedResponse({ description: 'Invalid email or password.' })
   @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
   @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
+  /**
+   * Authenticate a candidate with email/password.
+   *
+   * @param dto Candidate login request body.
+   * @returns Auth payload containing JWT and profile data.
+   */
   loginCandidate(@Body() dto: LoginDto): Promise<{ message: string; data: AuthTokenPayload }> {
     return this.authService.loginCandidate(dto);
   }
@@ -123,6 +140,12 @@ export class AuthController {
   @ApiForbiddenResponse({ description: 'User is not registered as a recruiter.' })
   @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
   @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
+  /**
+   * Authenticate a recruiter account and return recruiter metadata when successful.
+   *
+   * @param dto Recruiter login request body.
+   * @returns Auth payload containing JWT and recruiter details.
+   */
   loginRecruiter(@Body() dto: LoginDto): Promise<{ message: string; data: AuthTokenPayload }> {
     return this.authService.loginRecruiter(dto);
   }
@@ -142,6 +165,12 @@ export class AuthController {
   @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })
   @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
   @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
+  /**
+   * Retrieve the authenticated user's profile using the bearer token.
+   *
+   * @param request Express request containing the decoded JWT payload.
+   * @returns Auth profile projection for the authenticated user.
+   */
   getProfile(
     @Req() request: Request & { user?: JwtPayload },
   ): Promise<{ message: string; data: AuthProfilePayload }> {

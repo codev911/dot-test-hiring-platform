@@ -10,8 +10,18 @@ import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import type { PaginationShape, StructuredResponse } from '../../utils/types/response.type';
 
+/**
+ * Wrap successful handler results in a consistent response envelope.
+ */
 @Injectable()
 export class SuccessResponseInterceptor implements NestInterceptor {
+  /**
+   * Intercept handler output and normalize the response structure.
+   *
+   * @param context Execution context that exposes the underlying HTTP response object.
+   * @param next Observable emitting the downstream handler result.
+   * @returns Observable yielding either raw binary data or the wrapped payload.
+   */
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     return next.handle().pipe(
       map((payload: unknown) => {
@@ -45,10 +55,22 @@ export class SuccessResponseInterceptor implements NestInterceptor {
     );
   }
 
+  /**
+   * Detect whether the payload represents binary content that should be streamed as-is.
+   *
+   * @param payload Handler result.
+   * @returns `true` when the payload is a `Buffer` instance.
+   */
   private isBinaryStream(payload: unknown): boolean {
     return payload instanceof Buffer;
   }
 
+  /**
+   * Break down the handler payload into message/data/pagination fragments.
+   *
+   * @param payload Handler result which may already resemble a structured response.
+   * @returns Structured response fragments consumed by the interceptor.
+   */
   private extractStructuredResponse(payload: unknown): StructuredResponse {
     if (payload === undefined) {
       return {};
@@ -85,6 +107,12 @@ export class SuccessResponseInterceptor implements NestInterceptor {
     };
   }
 
+  /**
+   * Determine the concrete `data` property value after removing processed keys.
+   *
+   * @param cloned Copy of the original payload without the message metadata.
+   * @returns Data payload or `undefined` when nothing remains.
+   */
   private determineData(cloned: Record<string, unknown>): unknown {
     if (Object.keys(cloned).length === 0) {
       return undefined;
@@ -103,6 +131,12 @@ export class SuccessResponseInterceptor implements NestInterceptor {
     return cloned;
   }
 
+  /**
+   * Extract pagination metadata provided either inline or under a nested object.
+   *
+   * @param source Payload object stripped of the message field.
+   * @returns Partial pagination structure when any fields are present.
+   */
   private extractPagination(source: Record<string, unknown>): Partial<PaginationShape> | undefined {
     if (source.pagination && typeof source.pagination === 'object') {
       const pagination = source.pagination as Record<string, unknown>;
@@ -126,6 +160,12 @@ export class SuccessResponseInterceptor implements NestInterceptor {
     return Object.keys(inlinePagination).length > 0 ? inlinePagination : undefined;
   }
 
+  /**
+   * Validate pagination fields to ensure all required numbers exist.
+   *
+   * @param pagination Partial pagination object.
+   * @returns Normalized pagination when valid; otherwise `undefined`.
+   */
   private normalizePagination(pagination?: Partial<PaginationShape>): PaginationShape | undefined {
     if (!pagination) {
       return undefined;
@@ -145,6 +185,12 @@ export class SuccessResponseInterceptor implements NestInterceptor {
     return undefined;
   }
 
+  /**
+   * Choose a default success message based on the HTTP status code.
+   *
+   * @param status Numeric HTTP status code.
+   * @returns Human-readable status message.
+   */
   private resolveMessage(status: number): string {
     const httpStatus = status as HttpStatus;
 

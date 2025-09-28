@@ -59,6 +59,13 @@ class EnvironmentVariables {
   JWT_EXPIRES_IN!: string;
 }
 
+/**
+ * Normalize truthy and falsy string representations to booleans.
+ *
+ * @param value Raw value from environment configuration.
+ * @param defaultValue Fallback when the value cannot be interpreted.
+ * @returns Boolean representation of the input.
+ */
 function normaliseBoolean(value: unknown, defaultValue: boolean): boolean {
   if (typeof value === 'string') {
     const normalised = value.trim().toLowerCase();

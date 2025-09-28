@@ -21,6 +21,13 @@ import type { RecuiterLevel } from '../utils/enums/recuiter-level.enum';
 
 @Injectable()
 export class AuthService {
+  /**
+   * Instantiate the auth service with repositories and JWT client.
+   *
+   * @param userRepository Repository handling {@link User} persistence.
+   * @param companyRecruiterRepository Repository for {@link CompanyRecruiter} entities.
+   * @param jwtService Nest wrapper around JSON Web Token signing and verification.
+   */
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
@@ -29,6 +36,13 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
+  /**
+   * Register a new candidate account and immediately issue an access token.
+   *
+   * @param dto Candidate registration payload.
+   * @returns Wrapped success message containing the JWT and sanitized user data.
+   * @throws ConflictException When the email is already registered.
+   */
   async registerCandidate(
     dto: RegisterUserDto,
   ): Promise<{ message: string; data: AuthTokenPayload }> {
@@ -55,6 +69,13 @@ export class AuthService {
     };
   }
 
+  /**
+   * Authenticate a candidate using email/password credentials.
+   *
+   * @param dto Candidate login payload.
+   * @returns Login response with access token and profile metadata.
+   * @throws UnauthorizedException When credentials are invalid.
+   */
   async loginCandidate(dto: LoginDto): Promise<{ message: string; data: AuthTokenPayload }> {
     const user = await this.userRepository.findOne({ where: { email: dto.email } });
 
@@ -70,6 +91,13 @@ export class AuthService {
     };
   }
 
+  /**
+   * Resolve the authenticated user profile from the JWT payload.
+   *
+   * @param payload Decoded JWT payload injected by the guard.
+   * @returns Profile response containing sanitized user info and role metadata.
+   * @throws UnauthorizedException When the payload is missing or user no longer exists.
+   */
   async getProfile(payload?: JwtPayload): Promise<{ message: string; data: AuthProfilePayload }> {
     if (!payload?.sub) {
       throw new UnauthorizedException('Authentication required.');
@@ -91,6 +119,14 @@ export class AuthService {
     };
   }
 
+  /**
+   * Authenticate a recruiter and return token enriched with recruiter membership details.
+   *
+   * @param dto Recruiter login payload.
+   * @returns Login response containing recruiter metadata embedded in the token.
+   * @throws UnauthorizedException When credentials are invalid.
+   * @throws ForbiddenException When the user has no active recruiter assignment.
+   */
   async loginRecruiter(dto: LoginDto): Promise<{ message: string; data: AuthTokenPayload }> {
     const user = await this.userRepository.findOne({ where: { email: dto.email } });
 
@@ -121,6 +157,14 @@ export class AuthService {
     };
   }
 
+  /**
+   * Construct the common JWT payload and response envelope for authenticated users.
+   *
+   * @param user Persisted user entity representing the account.
+   * @param role Indicates whether the session belongs to a candidate or recruiter.
+   * @param recruiterMetadata Optional recruiter details to embed in the payload.
+   * @returns Auth token payload consumed by controllers.
+   */
   private async buildAuthPayload(
     user: User,
     role: 'candidate' | 'recruiter',
@@ -147,6 +191,12 @@ export class AuthService {
     return authPayload;
   }
 
+  /**
+   * Remove sensitive fields from the user entity before returning to clients.
+   *
+   * @param user User entity to sanitize.
+   * @returns Safe user projection.
+   */
   private sanitizeUser(user: User): AuthenticatedUser {
     return {
       id: user.id,

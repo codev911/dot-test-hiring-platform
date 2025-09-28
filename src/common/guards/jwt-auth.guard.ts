@@ -2,10 +2,23 @@ import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from
 import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
 
+/**
+ * Guard ensuring requests include a valid bearer token before reaching controllers.
+ */
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
+  /**
+   * @param jwtService Service responsible for verifying access tokens.
+   */
   constructor(private readonly jwtService: JwtService) {}
 
+  /**
+   * Validate the bearer token and attach the decoded payload to the request object.
+   *
+   * @param context Execution context containing the HTTP request.
+   * @returns `true` when authentication succeeds.
+   * @throws UnauthorizedException When the token is missing or invalid.
+   */
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context
       .switchToHttp()
@@ -25,6 +38,12 @@ export class JwtAuthGuard implements CanActivate {
     }
   }
 
+  /**
+   * Read the bearer token from the `Authorization` header if present.
+   *
+   * @param request Express request instance.
+   * @returns The token string or `undefined` when not provided.
+   */
   private extractTokenFromHeader(request: Request): string | undefined {
     const authHeader = request.headers['authorization'];
     if (!authHeader) {

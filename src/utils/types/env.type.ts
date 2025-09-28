@@ -1,5 +1,8 @@
 import type { NodeEnv } from '../enums/node-env.enum';
 
+/**
+ * Typed contract describing environment variables required by the application.
+ */
 export type Env = {
   NODE_ENV: NodeEnv;
   PORT: number;

@@ -13,6 +13,7 @@ import type { Env } from './utils/types/env.type';
 import { ErrorResponseInterceptor } from './common/interceptors/error-response.interceptor';
 import { SuccessResponseInterceptor } from './common/interceptors/success-response.interceptor';
 import { AuthModule } from './auth/auth.module';
+import { UserModule } from './user/user.module';
 
 /**
  * Root NestJS module that wires together controllers and providers for the application runtime.
@@ -47,6 +48,7 @@ import { AuthModule } from './auth/auth.module';
       throttlers: [RATE_LIMIT],
     }),
     AuthModule,
+    UserModule,
   ],
   controllers: [AppController],
   providers: [

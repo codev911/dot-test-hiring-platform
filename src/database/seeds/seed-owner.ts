@@ -6,6 +6,11 @@ import { Company } from '../../entities/company.entity';
 import { CompanyRecruiter } from '../../entities/company-recruiter.entity';
 import { RecuiterLevel } from '../../utils/enums/recuiter-level.enum';
 
+/**
+ * Seed a default owner user, company, and recruiter link for initial setup.
+ *
+ * @param ds Active TypeORM data source used for transactional work.
+ */
 async function seedOwner(ds: DataSource): Promise<void> {
   const queryRunner = ds.createQueryRunner();
 
@@ -73,6 +78,9 @@ async function seedOwner(ds: DataSource): Promise<void> {
   }
 }
 
+/**
+ * Bootstrap the seeding script, ensuring the data source lifecycle is handled safely.
+ */
 async function bootstrap(): Promise<void> {
   if (!appDataSource.isInitialized) {
     await appDataSource.initialize();

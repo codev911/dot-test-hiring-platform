@@ -10,6 +10,9 @@ import { collectEnv } from '../utils/config/env.util';
 import type { Env } from '../utils/types/env.type';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 
+/**
+ * Nest module wiring authentication controllers, services, and dependencies.
+ */
 @Module({
   imports: [
     ConfigModule,
@@ -17,6 +20,9 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
+      /**
+       * Configure JWT signing options using validated environment variables.
+       */
       useFactory: (configService: ConfigService<Env>) => {
         const env = collectEnv(configService);
         return {

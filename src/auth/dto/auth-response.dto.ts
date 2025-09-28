@@ -1,6 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { RecuiterLevel } from '../../utils/enums/recuiter-level.enum';
 
+/**
+ * Swagger projection of the sanitized user returned to clients.
+ */
 export class AuthenticatedUserDto {
   @ApiProperty({ example: '1' })
   id!: string;
@@ -15,6 +18,9 @@ export class AuthenticatedUserDto {
   lastName?: string;
 }
 
+/**
+ * Swagger projection representing recruiter-specific metadata.
+ */
 export class RecruiterMetadataDto {
   @ApiProperty({ example: '10' })
   companyId!: string;
@@ -23,6 +29,9 @@ export class RecruiterMetadataDto {
   recuiterLevel!: RecuiterLevel;
 }
 
+/**
+ * Wrapper describing the response payload returned alongside JWTs.
+ */
 export class AuthTokenPayloadDto {
   @ApiProperty({ example: 'jwt-token' })
   accessToken!: string;
@@ -37,6 +46,9 @@ export class AuthTokenPayloadDto {
   recruiter?: RecruiterMetadataDto;
 }
 
+/**
+ * Generic success response used by register/login endpoints.
+ */
 export class AuthResponseDto {
   @ApiProperty({ example: 'Login successful.' })
   message!: string;
@@ -45,6 +57,9 @@ export class AuthResponseDto {
   data!: AuthTokenPayloadDto;
 }
 
+/**
+ * Response shape for the authenticated profile endpoint.
+ */
 export class AuthProfilePayloadDto {
   @ApiProperty({ type: AuthenticatedUserDto })
   user!: AuthenticatedUserDto;
@@ -56,6 +71,9 @@ export class AuthProfilePayloadDto {
   recruiter?: RecruiterMetadataDto;
 }
 
+/**
+ * Wrapper describing the profile success response.
+ */
 export class AuthProfileResponseDto {
   @ApiProperty({ example: 'Profile retrieved.' })
   message!: string;

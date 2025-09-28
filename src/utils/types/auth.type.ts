@@ -1,5 +1,8 @@
 import type { RecuiterLevel } from '../enums/recuiter-level.enum';
 
+/**
+ * Minimal projection of a user returned to clients.
+ */
 export type AuthenticatedUser = {
   id: string;
   email: string;
@@ -7,6 +10,9 @@ export type AuthenticatedUser = {
   lastName?: string;
 };
 
+/**
+ * Structure returned by login/register endpoints.
+ */
 export type AuthTokenPayload = {
   accessToken: string;
   user: AuthenticatedUser;
@@ -17,6 +23,9 @@ export type AuthTokenPayload = {
   };
 };
 
+/**
+ * Decoded JWT payload injected by the auth guard.
+ */
 export type JwtPayload = {
   sub: string;
   email: string;
@@ -27,6 +36,9 @@ export type JwtPayload = {
   };
 };
 
+/**
+ * Structure returned by the `/auth/me` profile endpoint.
+ */
 export type AuthProfilePayload = {
   user: AuthenticatedUser;
   role: 'candidate' | 'recruiter';

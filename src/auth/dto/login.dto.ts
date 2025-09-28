@@ -2,6 +2,9 @@ import { Transform } from 'class-transformer';
 import { IsEmail, IsNotEmpty, IsString, MaxLength, MinLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
+/**
+ * Payload contract for login endpoints.
+ */
 export class LoginDto {
   @ApiProperty({ example: 'candidate@example.com', maxLength: 320 })
   @IsEmail()

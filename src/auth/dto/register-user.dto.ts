@@ -2,6 +2,9 @@ import { Transform } from 'class-transformer';
 import { IsEmail, IsNotEmpty, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
+/**
+ * Payload contract for candidate registration requests.
+ */
 export class RegisterUserDto {
   @ApiProperty({ example: 'Jane', maxLength: 255 })
   @IsString()

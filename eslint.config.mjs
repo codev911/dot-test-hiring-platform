@@ -28,6 +28,10 @@ export default tseslint.config(
       },
     },
     rules: {
+      // Prettier conflicts resolution
+      'prettier/prettier': 'error',
+
+      // TypeScript specific rules
       '@typescript-eslint/consistent-type-imports': [
         'error',
         {
@@ -58,11 +62,15 @@ export default tseslint.config(
       ],
       '@typescript-eslint/no-unsafe-call': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
       '@typescript-eslint/no-unused-vars': [
         'error',
         {
           argsIgnorePattern: '^_',
           varsIgnorePattern: '^_',
+          ignoreRestSiblings: true,
         },
       ],
       '@typescript-eslint/prefer-readonly': 'warn',
@@ -71,9 +79,16 @@ export default tseslint.config(
         {
           allowNumber: true,
           allowBoolean: true,
+          allowNullish: true,
         },
       ],
+
+      // General rules
       'no-console': 'error',
+      'prefer-const': 'error',
+      'no-var': 'error',
+      'object-shorthand': 'error',
+      'prefer-template': 'error',
     },
   },
   {

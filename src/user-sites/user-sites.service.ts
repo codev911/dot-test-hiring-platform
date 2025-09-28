@@ -1,11 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
+import type { DataSource, EntityManager } from 'typeorm';
 import { UserSites } from '../entities/user-sites.entity';
 import { User } from '../entities/user.entity';
 import { UserWebsite } from '../utils/enums/user-website.enum';
 import { UpsertUserSiteDto } from './dto/upsert-user-site.dto';
 import type { UserSiteData } from '../utils/types/user.type';
+import { withTransaction } from '../utils/database/transaction.util';
+import { Optional } from '@nestjs/common';
 
 /**
  * Application service that encapsulates user site management tasks.
@@ -24,6 +27,7 @@ export class UserSitesService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(UserSites)
     private readonly userSitesRepository: Repository<UserSites>,
+    @Optional() private readonly dataSource?: DataSource,
   ) {}
 
   /**
@@ -53,7 +57,10 @@ export class UserSitesService {
     if (existingSite) {
       // Update existing site
       existingSite.url = upsertUserSiteDto.url;
-      userSite = await this.userSitesRepository.save(existingSite);
+      userSite = await withTransaction(this.dataSource, async (em?: EntityManager) => {
+        const repo = em ? em.getRepository(UserSites) : this.userSitesRepository;
+        return repo.save(existingSite);
+      });
     } else {
       // Create new site
       const newSite = this.userSitesRepository.create({
@@ -61,7 +68,10 @@ export class UserSitesService {
         siteType: upsertUserSiteDto.siteType,
         url: upsertUserSiteDto.url,
       });
-      userSite = await this.userSitesRepository.save(newSite);
+      userSite = await withTransaction(this.dataSource, async (em?: EntityManager) => {
+        const repo = em ? em.getRepository(UserSites) : this.userSitesRepository;
+        return repo.save(newSite);
+      });
     }
 
     return this.mapToUserSiteData(userSite);
@@ -118,7 +128,11 @@ export class UserSitesService {
       throw new NotFoundException('User site not found.');
     }
 
-    await this.userSitesRepository.remove(site);
+    await withTransaction(this.dataSource, async (em?: EntityManager) => {
+      const repo = em ? em.getRepository(UserSites) : this.userSitesRepository;
+      await repo.remove(site);
+      return undefined;
+    });
   }
 
   /**

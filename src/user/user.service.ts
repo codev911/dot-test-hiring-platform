@@ -7,12 +7,15 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
+import type { DataSource, EntityManager } from 'typeorm';
 import { User } from '../entities/user.entity';
 import { BucketService } from '../services/bucket.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import type { UserAvatarData, PasswordChangeData } from '../utils/types/user.type';
 import { HashingService } from '../services/hashing.service';
 import type { PutObjectCommandInput } from '@aws-sdk/client-s3';
+import { withTransaction } from '../utils/database/transaction.util';
+import { Optional } from '@nestjs/common';
 
 /**
  * Application service that encapsulates user profile management tasks.
@@ -29,6 +32,7 @@ export class UserService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly bucketService: BucketService,
+    @Optional() private readonly dataSource?: DataSource,
   ) {}
 
   /**
@@ -63,7 +67,11 @@ export class UserService {
     }
 
     user.password = UserService.hashPassword(user.email, dto.newPassword);
-    await this.userRepository.save(user);
+    await withTransaction(this.dataSource, async (em?: EntityManager) => {
+      const repo = em ? em.getRepository(User) : this.userRepository;
+      await repo.save(user);
+      return undefined;
+    });
 
     return {
       message: 'Password updated successfully.',
@@ -104,7 +112,11 @@ export class UserService {
     );
 
     user.avatarPath = key;
-    await this.userRepository.save(user);
+    await withTransaction(this.dataSource, async (em?: EntityManager) => {
+      const repo = em ? em.getRepository(User) : this.userRepository;
+      await repo.save(user);
+      return undefined;
+    });
 
     return {
       message: 'Avatar updated successfully.',

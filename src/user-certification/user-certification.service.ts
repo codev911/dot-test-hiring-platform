@@ -2,6 +2,7 @@ import path from 'node:path';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
+import type { DataSource, EntityManager } from 'typeorm';
 import { UserCertification } from '../entities/user-certification.entity';
 import { User } from '../entities/user.entity';
 import { BucketService } from '../services/bucket.service';
@@ -12,6 +13,8 @@ import type {
   PaginatedUserCertificationsData,
 } from '../utils/types/user.type';
 import type { PutObjectCommandInput } from '@aws-sdk/client-s3';
+import { withTransaction } from '../utils/database/transaction.util';
+import { Optional } from '@nestjs/common';
 
 /**
  * Application service that encapsulates user certification management tasks.
@@ -31,6 +34,7 @@ export class UserCertificationService {
     @InjectRepository(UserCertification)
     private readonly userCertificationRepository: Repository<UserCertification>,
     private readonly bucketService: BucketService,
+    @Optional() private readonly dataSource?: DataSource,
   ) {}
 
   /**
@@ -56,7 +60,13 @@ export class UserCertificationService {
       ...createUserCertificationDto,
     });
 
-    const savedCertification = await this.userCertificationRepository.save(userCertification);
+    const savedCertification = await withTransaction(
+      this.dataSource,
+      async (em?: EntityManager) => {
+        const repo = em ? em.getRepository(UserCertification) : this.userCertificationRepository;
+        return repo.save(userCertification);
+      },
+    );
     return this.mapToUserCertificationData(savedCertification);
   }
 
@@ -130,7 +140,13 @@ export class UserCertificationService {
     }
 
     Object.assign(certification, updateUserCertificationDto);
-    const updatedCertification = await this.userCertificationRepository.save(certification);
+    const updatedCertification = await withTransaction(
+      this.dataSource,
+      async (em?: EntityManager) => {
+        const repo = em ? em.getRepository(UserCertification) : this.userCertificationRepository;
+        return repo.save(certification);
+      },
+    );
 
     return this.mapToUserCertificationData(updatedCertification);
   }
@@ -162,7 +178,11 @@ export class UserCertificationService {
       }
     }
 
-    await this.userCertificationRepository.remove(certification);
+    await withTransaction(this.dataSource, async (em?: EntityManager) => {
+      const repo = em ? em.getRepository(UserCertification) : this.userCertificationRepository;
+      await repo.remove(certification);
+      return undefined;
+    });
   }
 
   /**
@@ -214,7 +234,11 @@ export class UserCertificationService {
 
     // Update certification record
     certification.certificatePath = key;
-    await this.userCertificationRepository.save(certification);
+    await withTransaction(this.dataSource, async (em?: EntityManager) => {
+      const repo = em ? em.getRepository(UserCertification) : this.userCertificationRepository;
+      await repo.save(certification);
+      return undefined;
+    });
 
     return {
       message: 'Certificate uploaded or replaced successfully.',

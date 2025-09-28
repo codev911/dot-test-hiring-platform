@@ -1,11 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
+import type { DataSource, EntityManager } from 'typeorm';
 import { UserEducation } from '../entities/user-education.entity';
 import { User } from '../entities/user.entity';
 import { CreateUserEducationDto } from './dto/create-user-education.dto';
 import { UpdateUserEducationDto } from './dto/update-user-education.dto';
 import type { UserEducationData, PaginatedUserEducationsData } from '../utils/types/user.type';
+import { withTransaction } from '../utils/database/transaction.util';
+import { Optional } from '@nestjs/common';
 
 /**
  * Application service that encapsulates user education management tasks.
@@ -23,6 +26,7 @@ export class UserEducationService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(UserEducation)
     private readonly userEducationRepository: Repository<UserEducation>,
+    @Optional() private readonly dataSource?: DataSource,
   ) {}
 
   /**
@@ -48,7 +52,10 @@ export class UserEducationService {
       ...createUserEducationDto,
     });
 
-    const savedEducation = await this.userEducationRepository.save(userEducation);
+    const savedEducation = await withTransaction(this.dataSource, async (em?: EntityManager) => {
+      const repo = em ? em.getRepository(UserEducation) : this.userEducationRepository;
+      return repo.save(userEducation);
+    });
     return this.mapToUserEducationData(savedEducation);
   }
 
@@ -122,7 +129,10 @@ export class UserEducationService {
     }
 
     Object.assign(education, updateUserEducationDto);
-    const updatedEducation = await this.userEducationRepository.save(education);
+    const updatedEducation = await withTransaction(this.dataSource, async (em?: EntityManager) => {
+      const repo = em ? em.getRepository(UserEducation) : this.userEducationRepository;
+      return repo.save(education);
+    });
 
     return this.mapToUserEducationData(updatedEducation);
   }
@@ -143,7 +153,11 @@ export class UserEducationService {
       throw new NotFoundException('User education not found.');
     }
 
-    await this.userEducationRepository.remove(education);
+    await withTransaction(this.dataSource, async (em?: EntityManager) => {
+      const repo = em ? em.getRepository(UserEducation) : this.userEducationRepository;
+      await repo.remove(education);
+      return undefined;
+    });
   }
 
   /**

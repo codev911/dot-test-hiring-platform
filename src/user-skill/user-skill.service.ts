@@ -1,11 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
+import type { DataSource, EntityManager } from 'typeorm';
 import { UserSkill } from '../entities/user-skill.entity';
 import { User } from '../entities/user.entity';
 import { CreateUserSkillDto } from './dto/create-user-skill.dto';
 import { UpdateUserSkillDto } from './dto/update-user-skill.dto';
 import type { UserSkillData, PaginatedUserSkillsData } from '../utils/types/user.type';
+import { withTransaction } from '../utils/database/transaction.util';
+import { Optional } from '@nestjs/common';
 
 /**
  * Application service that encapsulates user skill management tasks.
@@ -23,6 +26,7 @@ export class UserSkillService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(UserSkill)
     private readonly userSkillRepository: Repository<UserSkill>,
+    @Optional() private readonly dataSource?: DataSource,
   ) {}
 
   /**
@@ -45,7 +49,10 @@ export class UserSkillService {
       ...createUserSkillDto,
     });
 
-    const savedSkill = await this.userSkillRepository.save(userSkill);
+    const savedSkill = await withTransaction(this.dataSource, async (em?: EntityManager) => {
+      const repo = em ? em.getRepository(UserSkill) : this.userSkillRepository;
+      return repo.save(userSkill);
+    });
     return this.mapToUserSkillData(savedSkill);
   }
 
@@ -119,7 +126,10 @@ export class UserSkillService {
     }
 
     Object.assign(skill, updateUserSkillDto);
-    const updatedSkill = await this.userSkillRepository.save(skill);
+    const updatedSkill = await withTransaction(this.dataSource, async (em?: EntityManager) => {
+      const repo = em ? em.getRepository(UserSkill) : this.userSkillRepository;
+      return repo.save(skill);
+    });
 
     return this.mapToUserSkillData(updatedSkill);
   }
@@ -140,7 +150,11 @@ export class UserSkillService {
       throw new NotFoundException('User skill not found.');
     }
 
-    await this.userSkillRepository.remove(skill);
+    await withTransaction(this.dataSource, async (em?: EntityManager) => {
+      const repo = em ? em.getRepository(UserSkill) : this.userSkillRepository;
+      await repo.remove(skill);
+      return undefined;
+    });
   }
 
   /**

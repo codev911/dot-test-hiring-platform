@@ -46,6 +46,14 @@ describe('JwtAuthGuard', () => {
     await expect(guard.canActivate(context)).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
+  it('throws when authorization header is not Bearer', async () => {
+    const context = createContext({ authorization: 'Basic abcdef' });
+
+    await expect(guard.canActivate(context)).rejects.toBeInstanceOf(UnauthorizedException);
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    expect(jwtService.verifyAsync).not.toHaveBeenCalled();
+  });
+
   it('attaches payload and returns true for valid token', async () => {
     const request = {
       headers: { authorization: 'Bearer valid-token' },

@@ -2,9 +2,12 @@ import path from 'node:path';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
+import type { DataSource, EntityManager } from 'typeorm';
 import { User } from '../entities/user.entity';
 import { UserResume } from '../entities/user-resume.entity';
 import { BucketService } from '../services/bucket.service';
+import { withTransaction } from '../utils/database/transaction.util';
+import { Optional } from '@nestjs/common';
 import type { UserResumeData } from '../utils/types/user.type';
 import type { PutObjectCommandInput } from '@aws-sdk/client-s3';
 
@@ -26,6 +29,7 @@ export class UserResumeService {
     @InjectRepository(UserResume)
     private readonly userResumeRepository: Repository<UserResume>,
     private readonly bucketService: BucketService,
+    @Optional() private readonly dataSource?: DataSource,
   ) {}
 
   /**
@@ -87,7 +91,11 @@ export class UserResumeService {
 
     const record = existing ?? this.userResumeRepository.create({ userId, resumePath: key });
     record.resumePath = key;
-    await this.userResumeRepository.save(record);
+    await withTransaction(this.dataSource, async (em?: EntityManager) => {
+      const repo = em ? em.getRepository(UserResume) : this.userResumeRepository;
+      await repo.save(record);
+      return undefined;
+    });
 
     return {
       message: 'Resume uploaded successfully.',

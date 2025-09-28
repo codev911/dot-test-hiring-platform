@@ -1,6 +1,7 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
+import type { DataSource, EntityManager } from 'typeorm';
 import { Company } from '../entities/company.entity';
 import { User } from '../entities/user.entity';
 import { CompanyRecruiter } from '../entities/company-recruiter.entity';
@@ -8,6 +9,7 @@ import type { CompanyData, RecruiterCreationData } from '../utils/types/company.
 import type { UpdateCompanyDto } from './dto/update-company.dto';
 import type { CreateRecruiterDto } from './dto/create-recruiter.dto';
 import { RecuiterLevel } from '../utils/enums/recuiter-level.enum';
+import { withTransaction } from '../utils/database/transaction.util';
 
 /**
  * Business logic for company operations.
@@ -26,6 +28,7 @@ export class CompanyService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(CompanyRecruiter)
     private readonly companyRecruiterRepository: Repository<CompanyRecruiter>,
+    @Optional() private readonly dataSource?: DataSource,
   ) {}
 
   /**
@@ -60,7 +63,10 @@ export class CompanyService {
     if (dto.logoPath !== undefined) company.logoPath = dto.logoPath;
     if (dto.description !== undefined) company.description = dto.description;
 
-    const saved = await this.companyRepository.save(company);
+    const saved = await withTransaction(this.dataSource, async (em?: EntityManager) => {
+      const repo = em ? em.getRepository(Company) : this.companyRepository;
+      return repo.save(company);
+    });
     return this.toCompanyData(saved);
   }
 
@@ -92,15 +98,22 @@ export class CompanyService {
       email: dto.email,
       password: dto.password,
     });
-    const savedUser = await this.userRepository.save(user);
-
-    const mapping = this.companyRecruiterRepository.create({
-      companyId: company.id,
-      recruiterId: savedUser.id,
-      recuiterLevel: RecuiterLevel.MANAGER,
-      is_active: true,
-    });
-    const savedMapping = await this.companyRecruiterRepository.save(mapping);
+    const { savedUser, savedMapping } = await withTransaction(
+      this.dataSource,
+      async (em?: EntityManager) => {
+        const userRepo = em ? em.getRepository(User) : this.userRepository;
+        const mapRepo = em ? em.getRepository(CompanyRecruiter) : this.companyRecruiterRepository;
+        const u = await userRepo.save(user);
+        const mapping = mapRepo.create({
+          companyId: company.id,
+          recruiterId: u.id,
+          recuiterLevel: RecuiterLevel.MANAGER,
+          is_active: true,
+        });
+        const m = await mapRepo.save(mapping);
+        return { savedUser: u, savedMapping: m };
+      },
+    );
 
     return {
       userId: savedUser.id,

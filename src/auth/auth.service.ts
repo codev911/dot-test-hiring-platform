@@ -8,6 +8,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { JwtService } from '@nestjs/jwt';
 import type { Repository } from 'typeorm';
+import type { DataSource, EntityManager } from 'typeorm';
 import { User } from '../entities/user.entity';
 import { CompanyRecruiter } from '../entities/company-recruiter.entity';
 import { RegisterUserDto } from './dto/register-user.dto';
@@ -19,6 +20,8 @@ import {
   type AuthProfilePayload,
 } from '../utils/types/auth.type';
 import type { RecuiterLevel } from '../utils/enums/recuiter-level.enum';
+import { withTransaction } from '../utils/database/transaction.util';
+import { Optional } from '@nestjs/common';
 
 @Injectable()
 export class AuthService {
@@ -35,6 +38,7 @@ export class AuthService {
     @InjectRepository(CompanyRecruiter)
     private readonly companyRecruiterRepository: Repository<CompanyRecruiter>,
     private readonly jwtService: JwtService,
+    @Optional() private readonly dataSource?: DataSource,
   ) {}
 
   /**
@@ -63,8 +67,10 @@ export class AuthService {
       email: dto.email,
       password: dto.password,
     });
-
-    const saved = await this.userRepository.save(user);
+    const saved = await withTransaction(this.dataSource, async (em?: EntityManager) => {
+      const repo = em ? em.getRepository(User) : this.userRepository;
+      return repo.save(user);
+    });
 
     const tokenPayload = await this.buildAuthPayload(saved, 'candidate');
 

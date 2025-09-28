@@ -134,11 +134,55 @@ describe('CompanyService', () => {
       expect(result.name).toBe('New Name');
     });
 
+    it('updates website, logoPath, and description', async () => {
+      const entity = makeCompany();
+      companyRepository.findOne.mockResolvedValue(entity);
+      const saved = makeCompany({
+        website: 'https://new.example.com',
+        logoPath: '/logos/new.png',
+        description: 'New desc',
+      });
+      companyRepository.save.mockResolvedValue(saved);
+
+      const dto: UpdateCompanyDto = {
+        website: 'https://new.example.com',
+        logoPath: '/logos/new.png',
+        description: 'New desc',
+      };
+
+      const result = await service.updateStaticCompany(dto);
+
+      expect(companyRepository.save).toHaveBeenCalled();
+      expect(result.website).toBe('https://new.example.com');
+      expect(result.logoPath).toBe('/logos/new.png');
+      expect(result.description).toBe('New desc');
+    });
+
     it('throws NotFound when missing', async () => {
       companyRepository.findOne.mockResolvedValue(null as any);
       await expect(service.updateStaticCompany({ name: 'X' })).rejects.toBeInstanceOf(
         NotFoundException,
       );
+    });
+
+    it('saves without changes when dto is empty', async () => {
+      const entity = makeCompany();
+      companyRepository.findOne.mockResolvedValue(entity);
+      companyRepository.save.mockResolvedValue(entity);
+
+      const result = await service.updateStaticCompany({});
+
+      expect(companyRepository.findOne).toHaveBeenCalledWith({ where: { id: '1' } });
+      expect(companyRepository.save).toHaveBeenCalledWith(entity);
+      expect(result).toEqual({
+        id: entity.id,
+        name: entity.name,
+        website: entity.website,
+        logoPath: entity.logoPath,
+        description: entity.description,
+        createdAt: entity.createdAt,
+        updatedAt: entity.updatedAt,
+      });
     });
   });
 

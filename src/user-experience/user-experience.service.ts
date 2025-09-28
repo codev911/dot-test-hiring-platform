@@ -1,11 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
+import type { DataSource, EntityManager } from 'typeorm';
 import { UserExperience } from '../entities/user-experience.entity';
 import { User } from '../entities/user.entity';
 import { CreateUserExperienceDto } from './dto/create-user-experience.dto';
 import { UpdateUserExperienceDto } from './dto/update-user-experience.dto';
 import type { UserExperienceData, PaginatedUserExperiencesData } from '../utils/types/user.type';
+import { withTransaction } from '../utils/database/transaction.util';
+import { Optional } from '@nestjs/common';
 
 /**
  * Application service that encapsulates user experience management tasks.
@@ -23,6 +26,7 @@ export class UserExperienceService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(UserExperience)
     private readonly userExperienceRepository: Repository<UserExperience>,
+    @Optional() private readonly dataSource?: DataSource,
   ) {}
 
   /**
@@ -48,7 +52,10 @@ export class UserExperienceService {
       ...createUserExperienceDto,
     });
 
-    const savedExperience = await this.userExperienceRepository.save(userExperience);
+    const savedExperience = await withTransaction(this.dataSource, async (em?: EntityManager) => {
+      const repo = em ? em.getRepository(UserExperience) : this.userExperienceRepository;
+      return repo.save(userExperience);
+    });
     return this.mapToUserExperienceData(savedExperience);
   }
 
@@ -122,7 +129,10 @@ export class UserExperienceService {
     }
 
     Object.assign(experience, updateUserExperienceDto);
-    const updatedExperience = await this.userExperienceRepository.save(experience);
+    const updatedExperience = await withTransaction(this.dataSource, async (em?: EntityManager) => {
+      const repo = em ? em.getRepository(UserExperience) : this.userExperienceRepository;
+      return repo.save(experience);
+    });
 
     return this.mapToUserExperienceData(updatedExperience);
   }
@@ -143,7 +153,11 @@ export class UserExperienceService {
       throw new NotFoundException('User experience not found.');
     }
 
-    await this.userExperienceRepository.remove(experience);
+    await withTransaction(this.dataSource, async (em?: EntityManager) => {
+      const repo = em ? em.getRepository(UserExperience) : this.userExperienceRepository;
+      await repo.remove(experience);
+      return undefined;
+    });
   }
 
   /**

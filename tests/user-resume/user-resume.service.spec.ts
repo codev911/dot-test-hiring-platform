@@ -122,4 +122,43 @@ describe('UserResumeService', () => {
       await expect(service.uploadResume(userId, pdf)).rejects.toBeInstanceOf(NotFoundException);
     });
   });
+
+  describe('getResume', () => {
+    it('returns resume url when present', async () => {
+      const user = createUser({});
+      userRepository.findOne.mockResolvedValue(user);
+      userResumeRepository.findOne.mockResolvedValue({
+        userId,
+        resumePath: 'resume/user-1.pdf',
+      } as UserResume);
+
+      const result = await service.getResume(userId);
+
+      expect(userRepository.findOne).toHaveBeenCalledWith({ where: { id: userId } });
+      expect(userResumeRepository.findOne).toHaveBeenCalledWith({ where: { userId } });
+      expect(bucketService.getPublicUrl).toHaveBeenCalledWith('resume/user-1.pdf');
+      expect(result).toEqual({
+        message: 'Resume retrieved successfully.',
+        data: { resumeUrl: 'http://localhost:9000/bucket/resume/user-1.pdf' },
+      });
+    });
+
+    it('returns null when resume not uploaded', async () => {
+      const user = createUser({});
+      userRepository.findOne.mockResolvedValue(user);
+      userResumeRepository.findOne.mockResolvedValue(null);
+
+      const result = await service.getResume(userId);
+
+      expect(result).toEqual({
+        message: 'Resume retrieved successfully.',
+        data: { resumeUrl: null },
+      });
+    });
+
+    it('throws NotFound when user missing', async () => {
+      userRepository.findOne.mockResolvedValue(null);
+      await expect(service.getResume(userId)).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
 });

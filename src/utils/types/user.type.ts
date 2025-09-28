@@ -41,3 +41,30 @@ export type PaginatedUserSkillsData = {
   limit: number;
   totalPage: number;
 };
+
+/**
+ * Shape describing user education information returned to clients.
+ */
+export type UserEducationData = {
+  id: string;
+  institution: string;
+  educationLevel: string;
+  fromMonth?: string;
+  fromYear: number;
+  toMonth?: string;
+  toYear: number;
+  description?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+};
+
+/**
+ * Paginated response for user educations.
+ */
+export type PaginatedUserEducationsData = {
+  data: UserEducationData[];
+  totalData: number;
+  page: number;
+  limit: number;
+  totalPage: number;
+};

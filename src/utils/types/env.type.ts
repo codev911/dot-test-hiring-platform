@@ -14,4 +14,8 @@ export type Env = {
   MYSQL_LOGGING: boolean;
   JWT_SECRET: string;
   JWT_EXPIRES_IN: string;
+  MINIO_ENDPOINT: string;
+  MINIO_ACCESS_KEY: string;
+  MINIO_SECRET_KEY: string;
+  MINIO_BUCKET: string;
 };

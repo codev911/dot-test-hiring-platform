@@ -16,6 +16,10 @@ describe('collectEnv', () => {
       MYSQL_LOGGING: true,
       JWT_SECRET: 'jwt-secret',
       JWT_EXPIRES_IN: '1h',
+      MINIO_ENDPOINT: 'http://localhost:9000',
+      MINIO_ACCESS_KEY: 'access',
+      MINIO_SECRET_KEY: 'secret',
+      MINIO_BUCKET: 'bucket',
     };
 
     const getOrThrow = jest.fn((key: string) => {

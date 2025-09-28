@@ -14,6 +14,7 @@ import { ErrorResponseInterceptor } from './common/interceptors/error-response.i
 import { SuccessResponseInterceptor } from './common/interceptors/success-response.interceptor';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
+import { BucketService } from './services/bucket.service';
 
 /**
  * Root NestJS module that wires together controllers and providers for the application runtime.
@@ -53,6 +54,7 @@ import { UserModule } from './user/user.module';
   controllers: [AppController],
   providers: [
     AppService,
+    BucketService,
     SuccessResponseInterceptor,
     ErrorResponseInterceptor,
     // using ThrottlerGuard to enable rate limit at AppController

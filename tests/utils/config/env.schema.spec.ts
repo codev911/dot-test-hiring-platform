@@ -10,6 +10,10 @@ describe('validateEnv', () => {
     MYSQL_DATABASE: 'test_db',
     JWT_SECRET: 'secret',
     JWT_EXPIRES_IN: '1h',
+    MINIO_ENDPOINT: 'http://localhost:9000',
+    MINIO_ACCESS_KEY: 'access',
+    MINIO_SECRET_KEY: 'secret',
+    MINIO_BUCKET: 'bucket',
   };
 
   it('returns defaults for optional values and coercions for supplied ones', () => {
@@ -29,6 +33,10 @@ describe('validateEnv', () => {
       MYSQL_LOGGING: false,
       JWT_SECRET: 'secret',
       JWT_EXPIRES_IN: '1h',
+      MINIO_ENDPOINT: 'http://localhost:9000',
+      MINIO_ACCESS_KEY: 'access',
+      MINIO_SECRET_KEY: 'secret',
+      MINIO_BUCKET: 'bucket',
     });
   });
 
@@ -44,6 +52,10 @@ describe('validateEnv', () => {
       MYSQL_LOGGING: 'true',
       JWT_SECRET: 'jwt-secret',
       JWT_EXPIRES_IN: '2h',
+      MINIO_ENDPOINT: 'http://minio',
+      MINIO_ACCESS_KEY: 'access2',
+      MINIO_SECRET_KEY: 'secret2',
+      MINIO_BUCKET: 'bucket2',
     });
 
     expect(result).toEqual({
@@ -57,6 +69,10 @@ describe('validateEnv', () => {
       MYSQL_LOGGING: true,
       JWT_SECRET: 'jwt-secret',
       JWT_EXPIRES_IN: '2h',
+      MINIO_ENDPOINT: 'http://minio',
+      MINIO_ACCESS_KEY: 'access2',
+      MINIO_SECRET_KEY: 'secret2',
+      MINIO_BUCKET: 'bucket2',
     });
   });
 
@@ -73,6 +89,10 @@ describe('validateEnv', () => {
         MYSQL_LOGGING: 'not-boolean',
         JWT_SECRET: '',
         JWT_EXPIRES_IN: '',
+        MINIO_ENDPOINT: '',
+        MINIO_ACCESS_KEY: '',
+        MINIO_SECRET_KEY: '',
+        MINIO_BUCKET: '',
       }),
     ).toThrow(/Invalid environment variables/);
   });
@@ -94,6 +114,10 @@ describe('validateEnv', () => {
       MYSQL_LOGGING: 'false',
       JWT_SECRET: 'config-jwt',
       JWT_EXPIRES_IN: '3h',
+      MINIO_ENDPOINT: 'http://config-minio',
+      MINIO_ACCESS_KEY: 'config-access',
+      MINIO_SECRET_KEY: 'config-key',
+      MINIO_BUCKET: 'config-bucket',
     });
 
     expect(result).toEqual({
@@ -107,6 +131,10 @@ describe('validateEnv', () => {
       MYSQL_LOGGING: false,
       JWT_SECRET: 'config-jwt',
       JWT_EXPIRES_IN: '3h',
+      MINIO_ENDPOINT: 'http://config-minio',
+      MINIO_ACCESS_KEY: 'config-access',
+      MINIO_SECRET_KEY: 'config-key',
+      MINIO_BUCKET: 'config-bucket',
     });
   });
 });

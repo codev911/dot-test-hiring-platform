@@ -57,6 +57,22 @@ class EnvironmentVariables {
   @IsString()
   @IsNotEmpty()
   JWT_EXPIRES_IN!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  MINIO_ENDPOINT!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  MINIO_ACCESS_KEY!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  MINIO_SECRET_KEY!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  MINIO_BUCKET!: string;
 }
 
 /**
@@ -126,6 +142,10 @@ export function validateEnv(config: Record<string, unknown>): Env {
     MYSQL_LOGGING: validated.MYSQL_LOGGING,
     JWT_SECRET: validated.JWT_SECRET,
     JWT_EXPIRES_IN: validated.JWT_EXPIRES_IN,
+    MINIO_ENDPOINT: validated.MINIO_ENDPOINT,
+    MINIO_ACCESS_KEY: validated.MINIO_ACCESS_KEY,
+    MINIO_SECRET_KEY: validated.MINIO_SECRET_KEY,
+    MINIO_BUCKET: validated.MINIO_BUCKET,
   };
 }
 

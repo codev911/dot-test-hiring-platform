@@ -20,5 +20,9 @@ export function collectEnv(configService: ConfigService<Env>): Env {
     MYSQL_LOGGING: configService.get<boolean>('MYSQL_LOGGING') ?? false,
     JWT_SECRET: configService.getOrThrow<string>('JWT_SECRET'),
     JWT_EXPIRES_IN: configService.getOrThrow<string>('JWT_EXPIRES_IN'),
+    MINIO_ENDPOINT: configService.getOrThrow<string>('MINIO_ENDPOINT'),
+    MINIO_ACCESS_KEY: configService.getOrThrow<string>('MINIO_ACCESS_KEY'),
+    MINIO_SECRET_KEY: configService.getOrThrow<string>('MINIO_SECRET_KEY'),
+    MINIO_BUCKET: configService.getOrThrow<string>('MINIO_BUCKET'),
   };
 }

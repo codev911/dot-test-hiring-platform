@@ -7,6 +7,7 @@ import { NodeEnv } from './utils/enums/node-env.enum';
 import type { Env } from './utils/types/env.type';
 import { collectEnv } from './utils/config/env.util';
 import { AppLogger } from './utils/log.util';
+import { BucketService } from './services/bucket.service';
 
 /**
  * Initialize the NestJS HTTP application and start listening for incoming requests.
@@ -25,6 +26,10 @@ async function bootstrap(): Promise<void> {
   // get config env
   const configService = app.get<ConfigService<Env>>(ConfigService);
   const { PORT, NODE_ENV } = collectEnv(configService);
+
+  // ensure bucket availability
+  const bucketService = app.get(BucketService);
+  await bucketService.ensureBucket();
 
   // enable swagger when is not production mode
   if (NODE_ENV !== NodeEnv.Production) {

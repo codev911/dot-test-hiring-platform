@@ -163,6 +163,33 @@ describe('BucketService', () => {
     expect(sendMock).toHaveBeenNthCalledWith(2, expect.any(GetBucketPolicyCommand));
     expect(sendMock).toHaveBeenNthCalledWith(3, expect.any(PutBucketPolicyCommand));
     expect(bucketPolicy).toBeDefined();
+
+    const appliedPolicy = JSON.parse(bucketPolicy ?? '{}') as {
+      Statement: Array<{
+        Sid: string;
+        Principal: unknown;
+        Effect: string;
+        Action: string[];
+        Resource: string[];
+      }>;
+    };
+
+    expect(appliedPolicy.Statement).toEqual([
+      {
+        Sid: 'AllowPublicListBucket',
+        Principal: '*',
+        Effect: 'Allow',
+        Action: ['s3:GetBucketLocation', 's3:ListBucket'],
+        Resource: ['arn:aws:s3:::bucket'],
+      },
+      {
+        Sid: 'AllowPublicReadObject',
+        Principal: '*',
+        Effect: 'Allow',
+        Action: ['s3:GetObject', 's3:GetObjectVersion'],
+        Resource: ['arn:aws:s3:::bucket/*'],
+      },
+    ]);
   });
 
   it('creates bucket when not found', async () => {
@@ -292,5 +319,52 @@ describe('BucketService', () => {
     expect(sendMock).toHaveBeenNthCalledWith(1, expect.any(HeadBucketCommand));
     expect(sendMock).toHaveBeenNthCalledWith(2, expect.any(GetBucketPolicyCommand));
     expect(sendMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('reapplies policy when parse fails', async () => {
+    bucketPolicy = 'not-json';
+
+    const service = createService();
+
+    await service.ensureBucket();
+
+    expect(sendMock).toHaveBeenNthCalledWith(1, expect.any(HeadBucketCommand));
+    expect(sendMock).toHaveBeenNthCalledWith(2, expect.any(GetBucketPolicyCommand));
+    expect(sendMock).toHaveBeenNthCalledWith(3, expect.any(PutBucketPolicyCommand));
+
+    const logger = (service as unknown as { logger: { warn: jest.Mock } }).logger;
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Unable to parse existing bucket policy for bucket. Reapplying public-read policy.',
+      ),
+    );
+  });
+
+  it('throws when fetching policy fails unexpectedly', async () => {
+    sendMock.mockImplementation((command: unknown) => {
+      if (command instanceof HeadBucketCommand) {
+        return {};
+      }
+
+      if (command instanceof GetBucketPolicyCommand) {
+        const err = new Error('Boom') as Error & { $metadata?: { httpStatusCode?: number } };
+        err.$metadata = { httpStatusCode: 500 };
+        throw err;
+      }
+
+      return {};
+    });
+
+    const service = createService();
+
+    await expect(service.ensureBucket()).rejects.toThrow(
+      /Failed to fetch bucket policy for bucket/,
+    );
+
+    const logger = (service as unknown as { logger: { error: jest.Mock } }).logger;
+    expect(logger.error).toHaveBeenCalledWith(
+      'Failed to fetch bucket policy for bucket',
+      expect.any(String),
+    );
   });
 });

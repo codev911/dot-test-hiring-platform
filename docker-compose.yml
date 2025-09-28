@@ -68,7 +68,7 @@ services:
       MYSQL_LOGGING: 'false'
       # JWT
       JWT_SECRET: example_jwt_secret
-      JWT_EXPIRES_IN: 1h
+      JWT_EXPIRES_IN: 2d
       # MinIO
       MINIO_ENDPOINT: http://minio:9000
       MINIO_ACCESS_KEY: minioadmin

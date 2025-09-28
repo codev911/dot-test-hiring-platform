@@ -8,6 +8,7 @@ import {
 import { HttpException } from '@nestjs/common/exceptions/http.exception';
 import { Observable, throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
+import { AppLogger } from '../../utils/log.util';
 
 /**
  * Normalize thrown exceptions into a consistent error envelope for API consumers.
@@ -22,8 +23,12 @@ export class ErrorResponseInterceptor implements NestInterceptor {
    * @returns Observable emitting either the original data or a wrapped error.
    */
   intercept(_context: ExecutionContext, next: CallHandler): Observable<unknown> {
+    const logger = new AppLogger(ErrorResponseInterceptor.name);
+
     return next.handle().pipe(
       catchError((error: unknown) => {
+        logger.error((error as Error).message, (error as Error).stack);
+
         if (error instanceof HttpException) {
           const status = error.getStatus();
           const response = error.getResponse();

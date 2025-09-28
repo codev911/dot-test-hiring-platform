@@ -30,4 +30,11 @@ export class RegisterUserDto {
   @MinLength(8)
   @MaxLength(255)
   password!: string;
+
+  @ApiProperty({ example: 'Password123!', minLength: 8, maxLength: 255 })
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(8)
+  @MaxLength(255)
+  confirmPassword!: string;
 }

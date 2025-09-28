@@ -1,4 +1,9 @@
-import { ConflictException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import type { JwtService } from '@nestjs/jwt';
 import type { Repository } from 'typeorm';
 import { AuthService } from '../../src/auth/auth.service';
@@ -63,6 +68,7 @@ describe('AuthService', () => {
         lastName: 'Last',
         email,
         password,
+        confirmPassword: password,
       };
       userRepository.findOne.mockResolvedValue(null);
       const created = createUser({ lastName: 'Last' });
@@ -111,8 +117,22 @@ describe('AuthService', () => {
           firstName: 'A',
           email,
           password,
+          confirmPassword: password,
         } as RegisterUserDto),
       ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('throws when password confirmation mismatches', async () => {
+      userRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.registerCandidate({
+          firstName: 'First',
+          email,
+          password,
+          confirmPassword: 'Different123!',
+        } as RegisterUserDto),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 

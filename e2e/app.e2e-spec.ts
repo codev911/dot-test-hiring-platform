@@ -1,3 +1,5 @@
+jest.unmock('@nestjs/jwt');
+
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { TestingModule } from '@nestjs/testing';

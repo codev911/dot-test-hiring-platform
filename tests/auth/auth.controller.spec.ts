@@ -27,6 +27,7 @@ describe('AuthController', () => {
       firstName: 'First',
       email: 'user@example.com',
       password: 'Password123!',
+      confirmPassword: 'Password123!',
     } as RegisterUserDto;
     service.registerCandidate.mockResolvedValue({ message: 'ok', data: {} } as never);
 

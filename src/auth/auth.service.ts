@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -50,6 +51,10 @@ export class AuthService {
 
     if (existing) {
       throw new ConflictException('Email is already registered.');
+    }
+
+    if (dto.password !== dto.confirmPassword) {
+      throw new BadRequestException('Password confirmation does not match.');
     }
 
     const user = this.userRepository.create({

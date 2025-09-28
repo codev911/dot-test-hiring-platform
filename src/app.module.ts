@@ -4,6 +4,7 @@ import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule, type TypeOrmModuleOptions } from '@nestjs/typeorm';
+import { JwtModule } from '@nestjs/jwt';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { collectEnv } from './utils/config/env.util';
@@ -14,7 +15,7 @@ import { ErrorResponseInterceptor } from './common/interceptors/error-response.i
 import { SuccessResponseInterceptor } from './common/interceptors/success-response.interceptor';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
-import { BucketService } from './services/bucket.service';
+import { BucketModule } from './services/bucket.module';
 
 /**
  * Root NestJS module that wires together controllers and providers for the application runtime.
@@ -44,17 +45,32 @@ import { BucketService } from './services/bucket.service';
         };
       },
     }),
+    // configure JWT module for application-wide usage
+    JwtModule.registerAsync({
+      global: true,
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService<Env>) => {
+        const env = collectEnv(configService);
+        return {
+          secret: env.JWT_SECRET,
+          signOptions: {
+            expiresIn: env.JWT_EXPIRES_IN,
+          },
+        };
+      },
+    }),
     // add rate limit max 100 per minutes
     ThrottlerModule.forRoot({
       throttlers: [RATE_LIMIT],
     }),
     AuthModule,
     UserModule,
+    BucketModule,
   ],
   controllers: [AppController],
   providers: [
     AppService,
-    BucketService,
     SuccessResponseInterceptor,
     ErrorResponseInterceptor,
     // using ThrottlerGuard to enable rate limit at AppController

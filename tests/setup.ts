@@ -1,4 +1,21 @@
 import 'reflect-metadata';
+import { Logger } from '@nestjs/common';
+
+// Silence NestJS Logger output in tests to keep output clean
+jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
+jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined as unknown as void);
+// Some versions of Nest Logger include fatal; guard in case it exists
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+if (
+  typeof (Logger.prototype as unknown as { fatal?: (msg: unknown, ctx?: string) => void }).fatal ===
+  'function'
+) {
+  jest
+    .spyOn(Logger.prototype as unknown as { fatal: (msg: unknown, ctx?: string) => void }, 'fatal')
+    .mockImplementation(() => undefined);
+}
 
 process.env.NODE_ENV ??= 'test';
 process.env.PORT ??= '3000';
@@ -102,14 +119,17 @@ jest.mock('@nestjs/typeorm', () => {
 jest.mock(
   '@nestjs/jwt',
   () => {
-    const registerAsync = jest.fn(() => ({
+    const registerAsync = jest.fn((options?: { global?: boolean }) => ({
       module: MockJwtModule,
+      global: options?.global ?? false,
       providers: [{ provide: MockJwtService, useClass: MockJwtService }],
       exports: [MockJwtService],
     }));
 
+    const JwtModule = Object.assign(class JwtModule {}, { registerAsync });
+
     return {
-      JwtModule: { registerAsync },
+      JwtModule,
       JwtService: MockJwtService,
     };
   },

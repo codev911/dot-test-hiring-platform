@@ -367,4 +367,12 @@ describe('BucketService', () => {
       expect.any(String),
     );
   });
+
+  it('builds public url using bucket endpoint', () => {
+    const service = createService();
+
+    const url = service.getPublicUrl('profile/user.png');
+
+    expect(url).toBe('http://localhost:9000/bucket/profile/user.png');
+  });
 });

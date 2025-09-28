@@ -26,6 +26,7 @@ import type {
 export class BucketService {
   private readonly client: S3Client;
   private readonly bucketName: string;
+  private readonly endpoint: string;
   private readonly logger = new Logger(BucketService.name);
 
   /**
@@ -34,14 +35,14 @@ export class BucketService {
    * @param configService Configurations provider for strongly typed environment variables.
    */
   constructor(private readonly configService: ConfigService<Env>) {
-    const endpoint = this.configService.getOrThrow<string>('MINIO_ENDPOINT');
+    this.endpoint = this.configService.getOrThrow<string>('MINIO_ENDPOINT').replace(/\/$/, '');
     const accessKeyId = this.configService.getOrThrow<string>('MINIO_ACCESS_KEY');
     const secretAccessKey = this.configService.getOrThrow<string>('MINIO_SECRET_KEY');
     this.bucketName = this.configService.getOrThrow<string>('MINIO_BUCKET');
 
     this.client = new S3Client({
       forcePathStyle: true,
-      endpoint,
+      endpoint: this.endpoint,
       region: 'us-east-1',
       credentials: {
         accessKeyId,
@@ -62,10 +63,9 @@ export class BucketService {
       this.logger.log(`Bucket ${this.bucketName} already exists`);
       bucketReady = true;
     } catch (error: unknown) {
-      const metadata =
-        (error as { $metadata?: { httpStatusCode?: number }; Code?: string; name?: string }) ?? {};
-      const statusCode = metadata.$metadata?.httpStatusCode;
-      const code = metadata.Code ?? metadata.name;
+      const metadata = this.extractAwsError(error);
+      const statusCode = metadata?.$metadata?.httpStatusCode;
+      const code = metadata?.Code ?? metadata?.name;
       const notFound = statusCode === 404 || code === 'NoSuchBucket' || code === 'NotFound';
       const accessDenied = statusCode === 403 || code === 'AccessDenied' || code === 'Forbidden';
 
@@ -87,11 +87,7 @@ export class BucketService {
           bucketReady = true;
         } catch (createError: unknown) {
           const createCause = createError instanceof Error ? createError : undefined;
-          const createMetadata = createError as {
-            Code?: string;
-            name?: string;
-            $metadata?: { httpStatusCode?: number };
-          };
+          const createMetadata = this.extractAwsError(createError);
           const createCode = createMetadata?.Code ?? createMetadata?.name ?? createCause?.name;
           const denied =
             createCode === 'AccessDenied' ||
@@ -242,11 +238,7 @@ export class BucketService {
    * @returns True when the bucket policy is missing.
    */
   private isMissingPolicy(error: unknown): boolean {
-    const metadata = error as {
-      Code?: string;
-      name?: string;
-      $metadata?: { httpStatusCode?: number };
-    };
+    const metadata = this.extractAwsError(error);
     const statusCode = metadata?.$metadata?.httpStatusCode;
     const code = metadata?.Code ?? metadata?.name;
 
@@ -340,5 +332,36 @@ export class BucketService {
     }
 
     return { AWS: cleanedList };
+  }
+
+  /**
+   * Normalize AWS SDK error objects to simplify metadata extraction.
+   *
+   * @param error Error thrown by the AWS SDK.
+   * @returns Structured metadata when available.
+   */
+  private extractAwsError(
+    error: unknown,
+  ): { Code?: string; name?: string; $metadata?: { httpStatusCode?: number } } | null {
+    if (typeof error === 'object' && error !== null) {
+      return error as {
+        Code?: string;
+        name?: string;
+        $metadata?: { httpStatusCode?: number };
+      };
+    }
+
+    return null;
+  }
+
+  /**
+   * Produce a public HTTP URL for the stored object key.
+   *
+   * @param key Object key within the bucket.
+   * @returns Publicly accessible URL pointing to the object.
+   */
+  getPublicUrl(key: string): string {
+    const trimmedKey = key.replace(/^\/+/, '');
+    return `${this.endpoint}/${this.bucketName}/${trimmedKey}`;
   }
 }

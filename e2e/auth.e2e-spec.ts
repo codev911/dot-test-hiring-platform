@@ -1,9 +1,12 @@
+jest.unmock('@nestjs/jwt');
+
 import type { INestApplication } from '@nestjs/common';
 import { UnauthorizedException, ForbiddenException, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
 import type { Request } from 'express';
+import { JwtModule, JwtService } from '@nestjs/jwt';
 import { AuthModule } from '../src/auth/auth.module';
 import { AuthController } from '../src/auth/auth.controller';
 import { RegisterUserDto } from '../src/auth/dto/register-user.dto';
@@ -40,17 +43,32 @@ describe('AuthController (e2e)', () => {
   let validationPipe: ValidationPipe;
 
   beforeEach(async () => {
-    const moduleFixture = await Test.createTestingModule({
-      imports: [AuthModule],
-    }).compile();
+    const moduleBuilder = Test.createTestingModule({
+      imports: [
+        AuthModule,
+        JwtModule.register({
+          global: true,
+          secret: 'test-secret',
+          signOptions: { expiresIn: '1h' },
+        }),
+      ],
+    })
+      .overrideProvider(JwtService)
+      .useValue({
+        signAsync: jest.fn(() => Promise.resolve('test-token')),
+        verifyAsync: jest.fn(() => Promise.resolve({ sub: 'user-id' })),
+      });
+
+    const moduleFixture = await moduleBuilder.compile();
 
     app = moduleFixture.createNestApplication();
     validationPipe = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true });
     await app.init();
 
     controller = app.get<AuthController>(AuthController);
-    userRepository = app.get(getRepositoryToken(User));
-    recruiterRepository = app.get(getRepositoryToken(CompanyRecruiter));
+    const authModuleRef = moduleFixture.select(AuthModule);
+    userRepository = authModuleRef.get(getRepositoryToken(User));
+    recruiterRepository = authModuleRef.get(getRepositoryToken(CompanyRecruiter));
   });
 
   afterEach(async () => {
@@ -64,6 +82,7 @@ describe('AuthController (e2e)', () => {
       lastName: 'Doe',
       email: 'candidate@example.com',
       password: 'Password123!',
+      confirmPassword: 'Password123!',
     };
 
     userRepository.findOne.mockResolvedValue(null);

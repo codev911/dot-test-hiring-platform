@@ -18,6 +18,7 @@ import type { UpdateJobRequirementDto } from '../../src/job-posting/dto/update-j
 import type { CreateJobSkillDto } from '../../src/job-posting/dto/create-job-skill.dto';
 import type { UpdateJobSkillDto } from '../../src/job-posting/dto/update-job-skill.dto';
 import { SkillPriority } from '../../src/utils/enums/skill-priority.enum';
+import { CacheHelperService } from '../../src/utils/cache/cache.service';
 
 const mockRecruiterId = 'rec-1';
 const mockCompanyId = 'comp-1';
@@ -57,6 +58,13 @@ describe('JobPostingService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         JobPostingService,
+        {
+          provide: CacheHelperService,
+          useValue: {
+            getOrSet: jest.fn((_k: string, supplier: any) => supplier()),
+            del: jest.fn(),
+          },
+        },
         {
           provide: getRepositoryToken(JobPosting),
           useValue: {

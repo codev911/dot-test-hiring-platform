@@ -18,4 +18,11 @@ export type Env = {
   MINIO_ACCESS_KEY: string;
   MINIO_SECRET_KEY: string;
   MINIO_BUCKET: string;
+  // Redis / cache configuration
+  REDIS_URL?: string; // e.g. redis://:password@localhost:6379/0
+  REDIS_HOST?: string;
+  REDIS_PORT?: number;
+  REDIS_PASSWORD?: string;
+  REDIS_DB?: number;
+  CACHE_TTL_MS?: number; // default time-to-live in milliseconds
 };

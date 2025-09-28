@@ -5,6 +5,7 @@ import {
   IsEnum,
   IsInt,
   IsNotEmpty,
+  IsOptional,
   IsString,
   Max,
   Min,
@@ -73,6 +74,31 @@ class EnvironmentVariables {
   @IsString()
   @IsNotEmpty()
   MINIO_BUCKET!: string;
+
+  // Optional URL takes precedence over individual REDIS_* parts
+  @IsString()
+  @IsOptional()
+  REDIS_URL?: string;
+
+  @IsString()
+  REDIS_HOST: string = '127.0.0.1';
+
+  @IsInt()
+  @Min(0)
+  @Max(65535)
+  REDIS_PORT: number = 6379;
+
+  @IsString()
+  @IsOptional()
+  REDIS_PASSWORD?: string;
+
+  @IsInt()
+  @Min(0)
+  REDIS_DB: number = 0;
+
+  @IsInt()
+  @Min(0)
+  CACHE_TTL_MS: number = 60_000; // 60 seconds by default
 }
 
 /**
@@ -146,6 +172,12 @@ export function validateEnv(config: Record<string, unknown>): Env {
     MINIO_ACCESS_KEY: validated.MINIO_ACCESS_KEY,
     MINIO_SECRET_KEY: validated.MINIO_SECRET_KEY,
     MINIO_BUCKET: validated.MINIO_BUCKET,
+    REDIS_URL: validated.REDIS_URL,
+    REDIS_HOST: validated.REDIS_HOST,
+    REDIS_PORT: validated.REDIS_PORT,
+    REDIS_PASSWORD: validated.REDIS_PASSWORD,
+    REDIS_DB: validated.REDIS_DB,
+    CACHE_TTL_MS: validated.CACHE_TTL_MS,
   };
 }
 

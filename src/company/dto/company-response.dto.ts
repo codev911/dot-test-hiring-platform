@@ -5,6 +5,9 @@ import type { CompanyData, RecruiterCreationData } from '../../utils/types/compa
  * Swagger response dto for company info.
  */
 export class CompanyResponseDto {
+  @ApiProperty({ example: 200 })
+  statusCode!: number;
+
   @ApiProperty({ example: 'Operation successful.' })
   message!: string;
 
@@ -26,6 +29,9 @@ export class CompanyResponseDto {
  * Swagger response dto for recruiter creation.
  */
 export class RecruiterCreationResponseDto {
+  @ApiProperty({ example: 201 })
+  statusCode!: number;
+
   @ApiProperty({ example: 'Recruiter created successfully.' })
   message!: string;
 

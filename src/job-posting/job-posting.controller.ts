@@ -26,6 +26,7 @@ import {
   ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { CacheTTL } from '@nestjs/cache-manager';
 import { JobPostingService } from './job-posting.service';
 import { CreateJobPostingDto } from './dto/create-job-posting.dto';
 import { UpdateJobPostingDto } from './dto/update-job-posting.dto';
@@ -256,6 +257,7 @@ export class JobPostingController {
    * @returns Paginated published job postings.
    */
   @Get('public')
+  @CacheTTL(60_000) // cache public listing for 60 seconds
   @ApiOperation({ summary: 'Get published job postings (public access)' })
   @ApiQuery({
     name: 'query',
@@ -317,6 +319,7 @@ export class JobPostingController {
    * @returns Job posting with full details.
    */
   @Get('public/:identifier')
+  @CacheTTL(120_000) // cache public detail for 120 seconds
   @ApiOperation({ summary: 'Get published job posting by ID or slug (public access)' })
   @ApiParam({ name: 'identifier', description: 'Job posting ID or slug' })
   @ApiOkResponse({

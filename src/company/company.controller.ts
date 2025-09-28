@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
+import { CacheTTL } from '@nestjs/cache-manager';
 import {
   ApiBadRequestResponse,
   ApiBody,
@@ -38,6 +39,7 @@ export class CompanyController {
    * @returns Company details.
    */
   @Get()
+  @CacheTTL(0) // no-expiry for company info; invalidated on updates
   @ApiOperation({ summary: 'Get public company info (no auth)' })
   @ApiOkResponse({ description: 'Company retrieved successfully.', type: CompanyResponseDto })
   @ApiNotFoundResponse({ description: 'Company not found.' })

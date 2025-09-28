@@ -24,5 +24,11 @@ export function collectEnv(configService: ConfigService<Env>): Env {
     MINIO_ACCESS_KEY: configService.getOrThrow<string>('MINIO_ACCESS_KEY'),
     MINIO_SECRET_KEY: configService.getOrThrow<string>('MINIO_SECRET_KEY'),
     MINIO_BUCKET: configService.getOrThrow<string>('MINIO_BUCKET'),
+    REDIS_URL: configService.get<string>('REDIS_URL'),
+    REDIS_HOST: configService.get<string>('REDIS_HOST'),
+    REDIS_PORT: configService.get<number>('REDIS_PORT'),
+    REDIS_PASSWORD: configService.get<string>('REDIS_PASSWORD'),
+    REDIS_DB: configService.get<number>('REDIS_DB'),
+    CACHE_TTL_MS: configService.get<number>('CACHE_TTL_MS'),
   };
 }

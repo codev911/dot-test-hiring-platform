@@ -1,4 +1,6 @@
 import { Injectable, NotFoundException, Optional, ForbiddenException } from '@nestjs/common';
+import { CacheHelperService } from '../utils/cache/cache.service';
+import { buildCacheKey } from '../utils/cache/cache.util';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository, EntityManager, DataSource } from 'typeorm';
 import { JobPosting } from '../entities/job-posting.entity';
@@ -50,6 +52,7 @@ export class JobPostingService {
     private readonly jobRequirementRepository: Repository<JobRequirement>,
     @InjectRepository(JobSkill)
     private readonly jobSkillRepository: Repository<JobSkill>,
+    private readonly cache: CacheHelperService,
     @Optional() private readonly dataSource?: DataSource,
   ) {}
 
@@ -94,6 +97,10 @@ export class JobPostingService {
       const repo = em ? em.getRepository(JobPosting) : this.jobPostingRepository;
       return repo.save(jobPosting);
     });
+
+    // Invalidate detail caches (by id and slug) so public reads refresh
+    await this.cache.del(buildCacheKey('jobs', 'public', 'detail', saved.id));
+    await this.cache.del(buildCacheKey('jobs', 'public', 'detail', saved.slug));
 
     return this.toJobPostingData(saved);
   }
@@ -244,6 +251,10 @@ export class JobPostingService {
       return repo.save(jobPosting);
     });
 
+    // Invalidate affected caches (detail by id and slug). Listings will naturally expire shortly.
+    await this.cache.del(buildCacheKey('jobs', 'public', 'detail', saved.id));
+    await this.cache.del(buildCacheKey('jobs', 'public', 'detail', saved.slug));
+
     return this.toJobPostingData(saved);
   }
 
@@ -272,6 +283,10 @@ export class JobPostingService {
       const repo = em ? em.getRepository(JobPosting) : this.jobPostingRepository;
       await repo.remove(jobPosting);
     });
+
+    // Invalidate detail caches (by id and slug)
+    await this.cache.del(buildCacheKey('jobs', 'public', 'detail', jobId));
+    await this.cache.del(buildCacheKey('jobs', 'public', 'detail', jobPosting.slug));
   }
 
   /**
@@ -287,73 +302,173 @@ export class JobPostingService {
     page: number = 1,
     limit: number = 10,
   ): Promise<PaginatedJobPostingsData> {
-    const skip = (page - 1) * limit;
-    const queryBuilder = this.jobPostingRepository
-      .createQueryBuilder('job')
-      .leftJoinAndSelect('job.company', 'company')
-      .where('job.isPublished = :isPublished', { isPublished: true });
+    const key = buildCacheKey(
+      'jobs',
+      'public',
+      'list',
+      filters.query,
+      filters.location,
+      filters.employmentType,
+      filters.workLocationType,
+      filters.salaryMin,
+      filters.salaryMax,
+      filters.salaryCurrency,
+      filters.companyId,
+      filters.skills?.join(','),
+      page,
+      limit,
+    );
 
-    if (filters.query) {
-      queryBuilder.andWhere(
-        '(LOWER(job.title) LIKE LOWER(:query) OR LOWER(job.description) LIKE LOWER(:query))',
-        { query: `%${filters.query}%` },
-      );
-    }
+    return this.cache.getOrSet<PaginatedJobPostingsData>(
+      key,
+      async () => {
+        const skip = (page - 1) * limit;
+        const queryBuilder = this.jobPostingRepository
+          .createQueryBuilder('job')
+          .leftJoinAndSelect('job.company', 'company')
+          .where('job.isPublished = :isPublished', { isPublished: true });
 
-    if (filters.employmentType) {
-      queryBuilder.andWhere('job.employmentType = :employmentType', {
-        employmentType: filters.employmentType,
-      });
-    }
+        if (filters.query) {
+          queryBuilder.andWhere(
+            '(LOWER(job.title) LIKE LOWER(:query) OR LOWER(job.description) LIKE LOWER(:query))',
+            { query: `%${filters.query}%` },
+          );
+        }
 
-    if (filters.workLocationType) {
-      queryBuilder.andWhere('job.workLocationType = :workLocationType', {
-        workLocationType: filters.workLocationType,
-      });
-    }
+        if (filters.employmentType) {
+          queryBuilder.andWhere('job.employmentType = :employmentType', {
+            employmentType: filters.employmentType,
+          });
+        }
 
-    if (filters.companyId) {
-      queryBuilder.andWhere('job.companyId = :companyId', {
-        companyId: filters.companyId,
-      });
-    }
+        if (filters.workLocationType) {
+          queryBuilder.andWhere('job.workLocationType = :workLocationType', {
+            workLocationType: filters.workLocationType,
+          });
+        }
 
-    if (filters.salaryMin) {
-      queryBuilder.andWhere('job.salaryMin >= :salaryMin', {
-        salaryMin: filters.salaryMin,
-      });
-    }
+        if (filters.companyId) {
+          queryBuilder.andWhere('job.companyId = :companyId', {
+            companyId: filters.companyId,
+          });
+        }
 
-    if (filters.salaryMax) {
-      queryBuilder.andWhere('job.salaryMax <= :salaryMax', {
-        salaryMax: filters.salaryMax,
-      });
-    }
+        if (filters.salaryMin) {
+          queryBuilder.andWhere('job.salaryMin >= :salaryMin', {
+            salaryMin: filters.salaryMin,
+          });
+        }
 
-    if (filters.salaryCurrency) {
-      queryBuilder.andWhere('job.salaryCurrency = :salaryCurrency', {
-        salaryCurrency: filters.salaryCurrency,
-      });
-    }
+        if (filters.salaryMax) {
+          queryBuilder.andWhere('job.salaryMax <= :salaryMax', {
+            salaryMax: filters.salaryMax,
+          });
+        }
 
-    queryBuilder.orderBy('job.createdAt', 'DESC').skip(skip).take(limit);
+        if (filters.salaryCurrency) {
+          queryBuilder.andWhere('job.salaryCurrency = :salaryCurrency', {
+            salaryCurrency: filters.salaryCurrency,
+          });
+        }
 
-    const [jobPostings, totalData] = await queryBuilder.getManyAndCount();
+        queryBuilder.orderBy('job.createdAt', 'DESC').skip(skip).take(limit);
 
-    const data = await Promise.all(
-      jobPostings.map(async (job) => {
+        const [jobPostings, totalData] = await queryBuilder.getManyAndCount();
+
+        const data = await Promise.all(
+          jobPostings.map(async (job) => {
+            const [benefits, requirements, skills] = await Promise.all([
+              this.jobBenefitRepository.find({ where: { jobId: job.id } }),
+              this.jobRequirementRepository.find({ where: { jobId: job.id } }),
+              this.jobSkillRepository.find({ where: { jobId: job.id } }),
+            ]);
+
+            return {
+              ...this.toJobPostingData(job),
+              company: {
+                id: job.company.id,
+                name: job.company.name,
+                description: job.company.description ?? undefined,
+              },
+              benefits: benefits.map((benefit) => ({
+                id: benefit.id,
+                jobId: benefit.jobId,
+                label: benefit.label,
+                description: benefit.description ?? undefined,
+                createdAt: benefit.createdAt!,
+                updatedAt: benefit.updatedAt!,
+              })),
+              requirements: requirements.map((req) => ({
+                id: req.id,
+                jobId: req.jobId,
+                label: req.label,
+                detail: req.detail ?? undefined,
+                createdAt: req.createdAt!,
+                updatedAt: req.updatedAt!,
+              })),
+              skills: skills.map((skill) => ({
+                id: skill.id,
+                jobId: skill.jobId,
+                skillName: skill.skillName,
+                priority: skill.priority,
+                proficiency: skill.proficiency,
+                createdAt: skill.createdAt!,
+                updatedAt: skill.updatedAt!,
+              })),
+            };
+          }),
+        );
+
+        const totalPage = Math.ceil(totalData / limit);
+
+        return {
+          data,
+          totalData,
+          page,
+          limit,
+          totalPage,
+        };
+      },
+      60_000,
+    ); // 60s TTL for listing
+  }
+
+  /**
+   * Get a specific published job posting by ID or slug (for candidates).
+   *
+   * @param identifier Job posting ID or slug.
+   * @returns Job posting with full details.
+   * @throws NotFoundException When job posting is not found or not published.
+   */
+  async getPublishedJobPosting(identifier: string): Promise<JobPostingWithCompanyData> {
+    const key = buildCacheKey('jobs', 'public', 'detail', identifier);
+    return this.cache.getOrSet<JobPostingWithCompanyData>(
+      key,
+      async () => {
+        const jobPosting = await this.jobPostingRepository.findOne({
+          where: [
+            { id: identifier, isPublished: true },
+            { slug: identifier, isPublished: true },
+          ],
+          relations: ['company'],
+        });
+
+        if (!jobPosting) {
+          throw new NotFoundException('Job posting not found or not published.');
+        }
+
         const [benefits, requirements, skills] = await Promise.all([
-          this.jobBenefitRepository.find({ where: { jobId: job.id } }),
-          this.jobRequirementRepository.find({ where: { jobId: job.id } }),
-          this.jobSkillRepository.find({ where: { jobId: job.id } }),
+          this.jobBenefitRepository.find({ where: { jobId: jobPosting.id } }),
+          this.jobRequirementRepository.find({ where: { jobId: jobPosting.id } }),
+          this.jobSkillRepository.find({ where: { jobId: jobPosting.id } }),
         ]);
 
         return {
-          ...this.toJobPostingData(job),
+          ...this.toJobPostingData(jobPosting),
           company: {
-            id: job.company.id,
-            name: job.company.name,
-            description: job.company.description ?? undefined,
+            id: jobPosting.company.id,
+            name: jobPosting.company.name,
+            description: jobPosting.company.description ?? undefined,
           },
           benefits: benefits.map((benefit) => ({
             id: benefit.id,
@@ -381,79 +496,9 @@ export class JobPostingService {
             updatedAt: skill.updatedAt!,
           })),
         };
-      }),
-    );
-
-    const totalPage = Math.ceil(totalData / limit);
-
-    return {
-      data,
-      totalData,
-      page,
-      limit,
-      totalPage,
-    };
-  }
-
-  /**
-   * Get a specific published job posting by ID or slug (for candidates).
-   *
-   * @param identifier Job posting ID or slug.
-   * @returns Job posting with full details.
-   * @throws NotFoundException When job posting is not found or not published.
-   */
-  async getPublishedJobPosting(identifier: string): Promise<JobPostingWithCompanyData> {
-    const jobPosting = await this.jobPostingRepository.findOne({
-      where: [
-        { id: identifier, isPublished: true },
-        { slug: identifier, isPublished: true },
-      ],
-      relations: ['company'],
-    });
-
-    if (!jobPosting) {
-      throw new NotFoundException('Job posting not found or not published.');
-    }
-
-    const [benefits, requirements, skills] = await Promise.all([
-      this.jobBenefitRepository.find({ where: { jobId: jobPosting.id } }),
-      this.jobRequirementRepository.find({ where: { jobId: jobPosting.id } }),
-      this.jobSkillRepository.find({ where: { jobId: jobPosting.id } }),
-    ]);
-
-    return {
-      ...this.toJobPostingData(jobPosting),
-      company: {
-        id: jobPosting.company.id,
-        name: jobPosting.company.name,
-        description: jobPosting.company.description ?? undefined,
       },
-      benefits: benefits.map((benefit) => ({
-        id: benefit.id,
-        jobId: benefit.jobId,
-        label: benefit.label,
-        description: benefit.description ?? undefined,
-        createdAt: benefit.createdAt!,
-        updatedAt: benefit.updatedAt!,
-      })),
-      requirements: requirements.map((req) => ({
-        id: req.id,
-        jobId: req.jobId,
-        label: req.label,
-        detail: req.detail ?? undefined,
-        createdAt: req.createdAt!,
-        updatedAt: req.updatedAt!,
-      })),
-      skills: skills.map((skill) => ({
-        id: skill.id,
-        jobId: skill.jobId,
-        skillName: skill.skillName,
-        priority: skill.priority,
-        proficiency: skill.proficiency,
-        createdAt: skill.createdAt!,
-        updatedAt: skill.updatedAt!,
-      })),
-    };
+      120_000,
+    ); // 120s TTL for detail
   }
 
   /**

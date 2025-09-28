@@ -37,6 +37,12 @@ describe('validateEnv', () => {
       MINIO_ACCESS_KEY: 'access',
       MINIO_SECRET_KEY: 'secret',
       MINIO_BUCKET: 'bucket',
+      REDIS_URL: undefined,
+      REDIS_HOST: '127.0.0.1',
+      REDIS_PORT: 6379,
+      REDIS_PASSWORD: undefined,
+      REDIS_DB: 0,
+      CACHE_TTL_MS: 60000,
     });
   });
 
@@ -73,6 +79,12 @@ describe('validateEnv', () => {
       MINIO_ACCESS_KEY: 'access2',
       MINIO_SECRET_KEY: 'secret2',
       MINIO_BUCKET: 'bucket2',
+      REDIS_URL: undefined,
+      REDIS_HOST: '127.0.0.1',
+      REDIS_PORT: 6379,
+      REDIS_PASSWORD: undefined,
+      REDIS_DB: 0,
+      CACHE_TTL_MS: 60000,
     });
   });
 
@@ -135,6 +147,12 @@ describe('validateEnv', () => {
       MINIO_ACCESS_KEY: 'config-access',
       MINIO_SECRET_KEY: 'config-key',
       MINIO_BUCKET: 'config-bucket',
+      REDIS_URL: undefined,
+      REDIS_HOST: '127.0.0.1',
+      REDIS_PORT: 6379,
+      REDIS_PASSWORD: undefined,
+      REDIS_DB: 0,
+      CACHE_TTL_MS: 60000,
     });
   });
 });

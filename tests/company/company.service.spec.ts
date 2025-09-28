@@ -9,6 +9,7 @@ import { RecuiterLevel } from '../../src/utils/enums/recuiter-level.enum';
 import type { UpdateCompanyDto } from '../../src/company/dto/update-company.dto';
 import type { CreateRecruiterDto } from '../../src/company/dto/create-recruiter.dto';
 import { ConflictException, NotFoundException } from '@nestjs/common';
+import { CacheHelperService } from '../../src/utils/cache/cache.service';
 
 describe('CompanyService', () => {
   let service: CompanyService;
@@ -61,6 +62,13 @@ describe('CompanyService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CompanyService,
+        {
+          provide: CacheHelperService,
+          useValue: {
+            getOrSet: jest.fn((_k: string, supplier: any) => supplier()),
+            del: jest.fn(),
+          },
+        },
         {
           provide: getRepositoryToken(Company),
           useValue: {

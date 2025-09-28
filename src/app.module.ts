@@ -4,12 +4,16 @@ import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule, type TypeOrmModuleOptions } from '@nestjs/typeorm';
+import { CacheModule } from '@nestjs/cache-manager';
+import Keyv from 'keyv';
+import KeyvRedis from '@keyv/redis';
 import path from 'node:path';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { ErrorResponseInterceptor } from './common/interceptors/error-response.interceptor';
 import { SuccessResponseInterceptor } from './common/interceptors/success-response.interceptor';
+import { HttpCacheInterceptor } from './common/interceptors/http-cache.interceptor';
 import { CompanyModule } from './company/company.module';
 import { BucketModule } from './services/bucket.module';
 import { UserCertificationModule } from './user-certification/user-certification.module';
@@ -24,6 +28,8 @@ import { JobApplicationModule } from './job-application/job-application.module';
 import { configModuleOptions } from './utils/config/env.schema';
 import { collectEnv } from './utils/config/env.util';
 import { RATE_LIMIT } from './utils/constants/rate-limit.constant';
+import { resolveRedisUrl, defaultTtlMs } from './utils/cache/cache.util';
+import { CacheHelperModule } from './utils/cache/cache.module';
 import type { Env } from './utils/types/env.type';
 
 /**
@@ -33,6 +39,22 @@ import type { Env } from './utils/types/env.type';
   imports: [
     // bootstrap config from .env and enforce schema defaults
     ConfigModule.forRoot(configModuleOptions),
+    // configure global cache with Redis store
+    CacheModule.registerAsync({
+      isGlobal: true,
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService<Env>) => {
+        const env = collectEnv(configService);
+        const ttl = defaultTtlMs(env);
+        const redisUrl = resolveRedisUrl(env);
+        return {
+          ttl,
+          store: new Keyv({ store: new KeyvRedis(redisUrl) }),
+        };
+      },
+    }),
+
     // configure database connection
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
@@ -85,6 +107,7 @@ import type { Env } from './utils/types/env.type';
     UserSitesModule,
     JobPostingModule,
     JobApplicationModule,
+    CacheHelperModule,
   ],
   controllers: [AppController],
   providers: [
@@ -103,6 +126,11 @@ import type { Env } from './utils/types/env.type';
     {
       provide: APP_INTERCEPTOR,
       useExisting: ErrorResponseInterceptor,
+    },
+    // Place cache interceptor last so it runs first and can cache final wrapped responses
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: HttpCacheInterceptor,
     },
   ],
 })

@@ -1,4 +1,6 @@
 import { ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { CacheHelperService } from '../utils/cache/cache.service';
+import { buildCacheKey } from '../utils/cache/cache.util';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
 import type { DataSource, EntityManager } from 'typeorm';
@@ -28,6 +30,7 @@ export class CompanyService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(CompanyRecruiter)
     private readonly companyRecruiterRepository: Repository<CompanyRecruiter>,
+    private readonly cache: CacheHelperService,
     @Optional() private readonly dataSource?: DataSource,
   ) {}
 
@@ -38,11 +41,18 @@ export class CompanyService {
    * @throws NotFoundException When the company record is missing.
    */
   async getStaticCompany(): Promise<CompanyData> {
-    const company = await this.companyRepository.findOne({ where: { id: '1' } });
-    if (!company) {
-      throw new NotFoundException('Company not found.');
-    }
-    return this.toCompanyData(company);
+    const key = buildCacheKey('company', 'static');
+    return this.cache.getOrSet<CompanyData>(
+      key,
+      async () => {
+        const company = await this.companyRepository.findOne({ where: { id: '1' } });
+        if (!company) {
+          throw new NotFoundException('Company not found.');
+        }
+        return this.toCompanyData(company);
+      },
+      0, // no-expiry; explicit 0 overrides global default TTL
+    );
   }
 
   /**
@@ -67,6 +77,10 @@ export class CompanyService {
       const repo = em ? em.getRepository(Company) : this.companyRepository;
       return repo.save(company);
     });
+
+    // invalidate cached public company data
+    await this.cache.del(buildCacheKey('company', 'static'));
+
     return this.toCompanyData(saved);
   }
 

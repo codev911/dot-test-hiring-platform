@@ -148,11 +148,16 @@ export class JobPostingController {
       limitNum,
     );
 
-    // Track recruiter HTTP cache key for this listing
-    const httpKey = buildHttpCacheKeyForUserPath(request.user.sub, '/job-posting/listing', {
-      page: pageNum,
-      limit: limitNum,
-    });
+    // Track recruiter HTTP cache key for this listing using only params actually present in URL
+    const queryForKey: Record<string, string | number> | undefined =
+      page || limit
+        ? { ...(page ? { page: pageNum } : {}), ...(limit ? { limit: limitNum } : {}) }
+        : undefined;
+    const httpKey = buildHttpCacheKeyForUserPath(
+      request.user.sub,
+      '/job-posting/listing',
+      queryForKey,
+    );
     const httpIndexKey = buildCacheKey(
       'idx',
       'http',
@@ -367,6 +372,12 @@ export class JobPostingController {
     @Param('identifier') identifier: string,
   ): Promise<{ message: string; data: JobPostingWithCompanyData }> {
     const jobPosting = await this.jobPostingService.getPublishedJobPosting(identifier);
+
+    // Track HTTP cache key for this public detail under index keyed by job ID
+    const httpKey = buildHttpCacheKeyForUserPath(undefined, `/job-posting/public/${identifier}`);
+    const httpIndexKey = buildCacheKey('idx', 'http', 'jobs', 'public', 'detail', jobPosting.id);
+    await this.cache.trackKey(httpIndexKey, httpKey);
+
     return { message: 'Published job posting retrieved successfully.', data: jobPosting };
   }
 

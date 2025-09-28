@@ -106,9 +106,12 @@ export class JobPostingService {
     await this.cache.invalidateIndex(buildCacheKey('idx', 'http', 'jobs', 'public', 'list'));
     // Also clear base HTTP key (no query params) for public listing
     await this.cache.del(buildHttpCacheKeyForUserPath(undefined, '/job-posting/public'));
-    // Invalidate recruiter listing
+    // Invalidate recruiter listing (service and HTTP indexes)
     await this.cache.invalidateIndex(
       buildCacheKey('idx', 'jobs', 'recruiter', 'list', companyRecruiterId),
+    );
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'jobs', 'recruiter', 'list', companyRecruiterId),
     );
 
     return this.toJobPostingData(saved);
@@ -143,13 +146,28 @@ export class JobPostingService {
           order: { createdAt: 'DESC' },
         });
 
-        const data = jobPostings.map((job) => this.toJobPostingWithCompanyData(job));
         const totalPage = Math.ceil(totalData / limit);
+        // If requested page exceeds total pages due to recent deletion, fallback to last page
+        const effectivePage = totalPage > 0 ? Math.min(page, totalPage) : 1;
+        let effectiveJobs = jobPostings;
+
+        if (effectivePage !== page) {
+          const fallbackSkip = (effectivePage - 1) * limit;
+          effectiveJobs = await this.jobPostingRepository.find({
+            where: { recruiterId: companyRecruiterId },
+            relations: ['company'],
+            skip: fallbackSkip,
+            take: limit,
+            order: { createdAt: 'DESC' },
+          });
+        }
+
+        const data = effectiveJobs.map((job) => this.toJobPostingWithCompanyData(job));
 
         return {
           data,
           totalData,
-          page,
+          page: effectivePage,
           limit,
           totalPage,
         };
@@ -282,6 +300,10 @@ export class JobPostingService {
     await this.cache.invalidateIndex(buildCacheKey('idx', 'jobs', 'public', 'list'));
     await this.cache.invalidateIndex(buildCacheKey('idx', 'http', 'jobs', 'public', 'list'));
     await this.cache.del(buildHttpCacheKeyForUserPath(undefined, '/job-posting/public'));
+    // Invalidate public detail HTTP cache for this job
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'jobs', 'public', 'detail', saved.id),
+    );
     // Invalidate recruiter caches for this recruiter (service + HTTP indices)
     await this.cache.del(buildCacheKey('jobs', 'recruiter', 'detail', companyRecruiterId, jobId));
     await this.cache.invalidateIndex(
@@ -339,6 +361,10 @@ export class JobPostingService {
     await this.cache.invalidateIndex(
       buildCacheKey('idx', 'http', 'jobs', 'recruiter', 'detail', companyRecruiterId),
     );
+    // Invalidate public detail HTTP cache for this job
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'jobs', 'public', 'detail', jobId),
+    );
   }
 
   /**
@@ -392,57 +418,109 @@ export class JobPostingService {
       key,
       async () => {
         const skip = (page - 1) * limit;
-        const queryBuilder = this.jobPostingRepository
+        const qb = this.jobPostingRepository
           .createQueryBuilder('job')
           .leftJoinAndSelect('job.company', 'company')
           .where('job.isPublished = :isPublished', { isPublished: true });
 
         if (filters.query) {
-          queryBuilder.andWhere(
+          qb.andWhere(
             '(LOWER(job.title) LIKE LOWER(:query) OR LOWER(job.description) LIKE LOWER(:query))',
             { query: `%${filters.query}%` },
           );
         }
 
         if (filters.employmentType) {
-          queryBuilder.andWhere('job.employmentType = :employmentType', {
+          qb.andWhere('job.employmentType = :employmentType', {
             employmentType: filters.employmentType,
           });
         }
 
         if (filters.workLocationType) {
-          queryBuilder.andWhere('job.workLocationType = :workLocationType', {
+          qb.andWhere('job.workLocationType = :workLocationType', {
             workLocationType: filters.workLocationType,
           });
         }
 
         if (filters.companyId) {
-          queryBuilder.andWhere('job.companyId = :companyId', {
+          qb.andWhere('job.companyId = :companyId', {
             companyId: filters.companyId,
           });
         }
 
         if (filters.salaryMin) {
-          queryBuilder.andWhere('job.salaryMin >= :salaryMin', {
+          qb.andWhere('job.salaryMin >= :salaryMin', {
             salaryMin: filters.salaryMin,
           });
         }
 
         if (filters.salaryMax) {
-          queryBuilder.andWhere('job.salaryMax <= :salaryMax', {
+          qb.andWhere('job.salaryMax <= :salaryMax', {
             salaryMax: filters.salaryMax,
           });
         }
 
         if (filters.salaryCurrency) {
-          queryBuilder.andWhere('job.salaryCurrency = :salaryCurrency', {
+          qb.andWhere('job.salaryCurrency = :salaryCurrency', {
             salaryCurrency: filters.salaryCurrency,
           });
         }
 
-        queryBuilder.orderBy('job.createdAt', 'DESC').skip(skip).take(limit);
+        qb.orderBy('job.createdAt', 'DESC').skip(skip).take(limit);
 
-        const [jobPostings, totalData] = await queryBuilder.getManyAndCount();
+        const [initialJobs, totalData] = await qb.getManyAndCount();
+        let jobPostings = initialJobs;
+
+        const totalPage = Math.ceil(totalData / limit);
+        const effectivePage = totalPage > 0 ? Math.min(page, totalPage) : 1;
+
+        if (effectivePage !== page) {
+          const fallbackSkip = (effectivePage - 1) * limit;
+          const fallbackQb = this.jobPostingRepository
+            .createQueryBuilder('job')
+            .leftJoinAndSelect('job.company', 'company')
+            .where('job.isPublished = :isPublished', { isPublished: true });
+
+          if (filters.query) {
+            fallbackQb.andWhere(
+              '(LOWER(job.title) LIKE LOWER(:query) OR LOWER(job.description) LIKE LOWER(:query))',
+              { query: `%${filters.query}%` },
+            );
+          }
+          if (filters.employmentType) {
+            fallbackQb.andWhere('job.employmentType = :employmentType', {
+              employmentType: filters.employmentType,
+            });
+          }
+          if (filters.workLocationType) {
+            fallbackQb.andWhere('job.workLocationType = :workLocationType', {
+              workLocationType: filters.workLocationType,
+            });
+          }
+          if (filters.companyId) {
+            fallbackQb.andWhere('job.companyId = :companyId', {
+              companyId: filters.companyId,
+            });
+          }
+          if (filters.salaryMin) {
+            fallbackQb.andWhere('job.salaryMin >= :salaryMin', {
+              salaryMin: filters.salaryMin,
+            });
+          }
+          if (filters.salaryMax) {
+            fallbackQb.andWhere('job.salaryMax <= :salaryMax', {
+              salaryMax: filters.salaryMax,
+            });
+          }
+          if (filters.salaryCurrency) {
+            fallbackQb.andWhere('job.salaryCurrency = :salaryCurrency', {
+              salaryCurrency: filters.salaryCurrency,
+            });
+          }
+
+          fallbackQb.orderBy('job.createdAt', 'DESC').skip(fallbackSkip).take(limit);
+          jobPostings = await fallbackQb.getMany();
+        }
 
         const data = await Promise.all(
           jobPostings.map(async (job) => {
@@ -488,12 +566,10 @@ export class JobPostingService {
           }),
         );
 
-        const totalPage = Math.ceil(totalData / limit);
-
         return {
           data,
           totalData,
-          page,
+          page: effectivePage,
           limit,
           totalPage,
         };
@@ -698,6 +774,10 @@ export class JobPostingService {
     await this.cache.invalidateIndex(buildCacheKey('idx', 'http', 'jobs', 'public', 'list'));
     await this.cache.del(buildHttpCacheKeyForUserPath(undefined, '/job-posting/public'));
     await this.cache.del(buildCacheKey('jobs', 'public', 'detail', jobId));
+    // Invalidate public HTTP detail index for this job
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'jobs', 'public', 'detail', jobId),
+    );
     await this.cache.del(buildCacheKey('jobs', 'recruiter', 'detail', companyRecruiterId, jobId));
     await this.cache.invalidateIndex(
       buildCacheKey('idx', 'http', 'jobs', 'recruiter', 'detail', companyRecruiterId),
@@ -782,6 +862,10 @@ export class JobPostingService {
     await this.cache.invalidateIndex(buildCacheKey('idx', 'http', 'jobs', 'public', 'list'));
     await this.cache.del(buildHttpCacheKeyForUserPath(undefined, '/job-posting/public'));
     await this.cache.del(buildCacheKey('jobs', 'public', 'detail', jobId));
+    // Invalidate public HTTP detail index for this job
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'jobs', 'public', 'detail', jobId),
+    );
     await this.cache.del(buildCacheKey('jobs', 'recruiter', 'detail', companyRecruiterId, jobId));
     await this.cache.invalidateIndex(
       buildCacheKey('idx', 'http', 'jobs', 'recruiter', 'detail', companyRecruiterId),
@@ -872,6 +956,10 @@ export class JobPostingService {
     await this.cache.invalidateIndex(buildCacheKey('idx', 'http', 'jobs', 'public', 'list'));
     await this.cache.del(buildHttpCacheKeyForUserPath(undefined, '/job-posting/public'));
     await this.cache.del(buildCacheKey('jobs', 'public', 'detail', jobId));
+    // Invalidate public HTTP detail index for this job
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'jobs', 'public', 'detail', jobId),
+    );
     await this.cache.del(buildCacheKey('jobs', 'recruiter', 'detail', companyRecruiterId, jobId));
 
     return {
@@ -1040,6 +1128,10 @@ export class JobPostingService {
     await this.cache.invalidateIndex(buildCacheKey('idx', 'http', 'jobs', 'public', 'list'));
     await this.cache.del(buildHttpCacheKeyForUserPath(undefined, '/job-posting/public'));
     await this.cache.del(buildCacheKey('jobs', 'public', 'detail', jobId));
+    // Invalidate public HTTP detail index for this job
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'jobs', 'public', 'detail', jobId),
+    );
     await this.cache.del(buildCacheKey('jobs', 'recruiter', 'detail', companyRecruiterId, jobId));
 
     return {
@@ -1161,6 +1253,10 @@ export class JobPostingService {
     await this.cache.invalidateIndex(buildCacheKey('idx', 'http', 'jobs', 'public', 'list'));
     await this.cache.del(buildHttpCacheKeyForUserPath(undefined, '/job-posting/public'));
     await this.cache.del(buildCacheKey('jobs', 'public', 'detail', jobId));
+    // Invalidate public HTTP detail index for this job
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'jobs', 'public', 'detail', jobId),
+    );
     await this.cache.del(buildCacheKey('jobs', 'recruiter', 'detail', companyRecruiterId, jobId));
     await this.cache.invalidateIndex(
       buildCacheKey('idx', 'http', 'jobs', 'recruiter', 'detail', companyRecruiterId),

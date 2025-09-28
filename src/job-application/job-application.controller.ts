@@ -136,6 +136,27 @@ export class JobApplicationController {
       pageNum,
       limitNum,
     );
+
+    // Track candidate HTTP cache key for this listing using only params present in URL
+    const queryForKey: Record<string, string | number> | undefined =
+      page || limit
+        ? { ...(page ? { page: pageNum } : {}), ...(limit ? { limit: limitNum } : {}) }
+        : undefined;
+    const httpKey = buildHttpCacheKeyForUserPath(
+      request.user.sub,
+      '/job-application/my-applications',
+      queryForKey,
+    );
+    const httpIndexKey = buildCacheKey(
+      'idx',
+      'http',
+      'job-application',
+      'candidate',
+      'list',
+      request.user.sub,
+    );
+    await this.cache.trackKey(httpIndexKey, httpKey);
+
     return { message: 'Job applications retrieved successfully.', data: result };
   }
 
@@ -170,6 +191,22 @@ export class JobApplicationController {
       request.user.sub,
       applicationId,
     );
+
+    // Track candidate HTTP cache key for this detail
+    const httpKey = buildHttpCacheKeyForUserPath(
+      request.user.sub,
+      `/job-application/my-applications/${applicationId}`,
+    );
+    const httpIndexKey = buildCacheKey(
+      'idx',
+      'http',
+      'job-application',
+      'candidate',
+      'detail',
+      request.user.sub,
+    );
+    await this.cache.trackKey(httpIndexKey, httpKey);
+
     return { message: 'Job application retrieved successfully.', data: application };
   }
 
@@ -249,14 +286,15 @@ export class JobApplicationController {
       limitNum,
     );
 
-    // Track recruiter HTTP cache key for this job applications listing
+    // Track recruiter HTTP cache key for this job applications listing (only provided params)
+    const queryForKey: Record<string, string | number> | undefined =
+      page || limit
+        ? { ...(page ? { page: pageNum } : {}), ...(limit ? { limit: limitNum } : {}) }
+        : undefined;
     const httpKey = buildHttpCacheKeyForUserPath(
       request.user.sub,
       `/job-application/job/${jobId}`,
-      {
-        page: pageNum,
-        limit: limitNum,
-      },
+      queryForKey,
     );
     const httpIndexKey = buildCacheKey(
       'idx',

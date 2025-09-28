@@ -226,13 +226,27 @@ export class JobApplicationService {
           order: { submittedAt: 'DESC' },
         });
 
-        const data = applications.map((app) => this.toJobApplicationWithRelationsData(app));
         const totalPage = Math.ceil(totalData / limit);
+        const effectivePage = totalPage > 0 ? Math.min(page, totalPage) : 1;
+        let effectiveApps = applications;
+
+        if (effectivePage !== page) {
+          const fallbackSkip = (effectivePage - 1) * limit;
+          effectiveApps = await this.jobApplicationRepository.find({
+            where: { candidateId },
+            relations: ['job', 'job.company', 'candidate', 'resume'],
+            skip: fallbackSkip,
+            take: limit,
+            order: { submittedAt: 'DESC' },
+          });
+        }
+
+        const data = effectiveApps.map((app) => this.toJobApplicationWithRelationsData(app));
 
         return {
           data,
           totalData,
-          page,
+          page: effectivePage,
           limit,
           totalPage,
         };
@@ -348,6 +362,41 @@ export class JobApplicationService {
     await this.cache.del(
       buildHttpCacheKeyForUserPath(candidateId, '/job-application/my-applications'),
     );
+    // Invalidate candidate HTTP detail index
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'job-application', 'candidate', 'detail', candidateId),
+    );
+
+    // Invalidate recruiter caches for job list/detail if available
+    const posting = await this.jobPostingRepository.findOne({ where: { id: application.jobId } });
+    if (posting) {
+      await this.cache.invalidateIndex(
+        buildCacheKey(
+          'idx',
+          'job-application',
+          'recruiter',
+          'job',
+          'list',
+          posting.recruiterId,
+          application.jobId,
+        ),
+      );
+      await this.cache.invalidateIndex(
+        buildCacheKey(
+          'idx',
+          'http',
+          'job-application',
+          'recruiter',
+          'job',
+          'list',
+          posting.recruiterId,
+          application.jobId,
+        ),
+      );
+      await this.cache.invalidateIndex(
+        buildCacheKey('idx', 'http', 'job-application', 'recruiter', 'detail', posting.recruiterId),
+      );
+    }
 
     return this.toJobApplicationData(saved);
   }
@@ -415,13 +464,27 @@ export class JobApplicationService {
           order: { submittedAt: 'DESC' },
         });
 
-        const data = applications.map((app) => this.toJobApplicationWithRelationsData(app));
         const totalPage = Math.ceil(totalData / limit);
+        const effectivePage = totalPage > 0 ? Math.min(page, totalPage) : 1;
+        let effectiveApps = applications;
+
+        if (effectivePage !== page) {
+          const fallbackSkip = (effectivePage - 1) * limit;
+          effectiveApps = await this.jobApplicationRepository.find({
+            where: { jobId },
+            relations: ['job', 'job.company', 'candidate', 'resume'],
+            skip: fallbackSkip,
+            take: limit,
+            order: { submittedAt: 'DESC' },
+          });
+        }
+
+        const data = effectiveApps.map((app) => this.toJobApplicationWithRelationsData(app));
 
         return {
           data,
           totalData,
-          page,
+          page: effectivePage,
           limit,
           totalPage,
         };
@@ -573,6 +636,17 @@ export class JobApplicationService {
     );
     await this.cache.del(
       buildHttpCacheKeyForUserPath(application.candidateId, '/job-application/my-applications'),
+    );
+    // Invalidate candidate HTTP detail index
+    await this.cache.invalidateIndex(
+      buildCacheKey(
+        'idx',
+        'http',
+        'job-application',
+        'candidate',
+        'detail',
+        application.candidateId,
+      ),
     );
 
     return this.toJobApplicationEventData(saved);

@@ -35,6 +35,7 @@ import {
   ApiUnsupportedMediaTypeResponse,
   ApiBadRequestResponse,
   ApiInternalServerErrorResponse,
+  ApiTooManyRequestsResponse,
 } from '@nestjs/swagger';
 import { UserCertificationService } from './user-certification.service';
 import { CreateUserCertificationDto } from './dto/create-user-certification.dto';
@@ -75,8 +76,11 @@ export class UserCertificationController {
     description: 'User certification created successfully.',
     type: UserCertificationResponseDto,
   })
+  @ApiBadRequestResponse({ description: 'Invalid input data or validation failed.' })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })
   @ApiForbiddenResponse({ description: 'Candidate role required.' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   async create(
     @Req() request: Request & { user?: JwtPayload },
     @Body() createUserCertificationDto: CreateUserCertificationDto,
@@ -120,6 +124,8 @@ export class UserCertificationController {
   })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })
   @ApiForbiddenResponse({ description: 'Candidate role required.' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   async findAll(
     @Req() request: Request & { user?: JwtPayload },
     @Query('page') page = 1,
@@ -167,6 +173,8 @@ export class UserCertificationController {
   @ApiNotFoundResponse({ description: 'User certification not found.' })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })
   @ApiForbiddenResponse({ description: 'Candidate role required.' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   async findOne(
     @Req() request: Request & { user?: JwtPayload },
     @Param('id') id: string,
@@ -194,9 +202,12 @@ export class UserCertificationController {
     description: 'User certification updated successfully.',
     type: UserCertificationResponseDto,
   })
+  @ApiBadRequestResponse({ description: 'Invalid input data or validation failed.' })
   @ApiNotFoundResponse({ description: 'User certification not found.' })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })
   @ApiForbiddenResponse({ description: 'Candidate role required.' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   async update(
     @Req() request: Request & { user?: JwtPayload },
     @Param('id') id: string,
@@ -228,6 +239,8 @@ export class UserCertificationController {
   @ApiNotFoundResponse({ description: 'User certification not found.' })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })
   @ApiForbiddenResponse({ description: 'Candidate role required.' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   async remove(
     @Req() request: Request & { user?: JwtPayload },
     @Param('id') id: string,
@@ -262,6 +275,7 @@ export class UserCertificationController {
   @ApiNotFoundResponse({ description: 'User certification not found.' })
   @ApiUnsupportedMediaTypeResponse({ description: 'File must be a PDF document.' })
   @ApiPayloadTooLargeResponse({ description: 'File must be <= 10MB.' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
   @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   @UseInterceptors(FileInterceptor('file'))
   async uploadCertificate(

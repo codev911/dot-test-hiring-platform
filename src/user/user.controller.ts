@@ -26,6 +26,7 @@ import {
   ApiInternalServerErrorResponse,
   ApiBadRequestResponse,
   ApiPayloadTooLargeResponse,
+  ApiTooManyRequestsResponse,
 } from '@nestjs/swagger';
 import { UserService } from './user.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -60,6 +61,7 @@ export class UserController {
   @ApiOkResponse({ description: 'Password updated successfully.' })
   @ApiBadRequestResponse({ description: 'Invalid current password or validation failed.' })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
   @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   changePassword(
     @Req() request: Request & { user?: JwtPayload },
@@ -85,6 +87,7 @@ export class UserController {
   @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })
   @ApiUnsupportedMediaTypeResponse({ description: 'File must be an image (PNG, JPG, GIF, WEBP).' })
   @ApiPayloadTooLargeResponse({ description: 'File must be <= 2MB.' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
   @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   @UseInterceptors(FileInterceptor('avatar'))
   updateAvatar(
@@ -113,6 +116,7 @@ export class UserController {
   @ApiOperation({ summary: 'Get user avatar URL' })
   @ApiOkResponse({ description: 'Avatar retrieved successfully.', type: AvatarResponseDto })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
   @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   getAvatar(
     @Req() request: Request & { user?: JwtPayload },

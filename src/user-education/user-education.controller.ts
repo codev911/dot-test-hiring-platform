@@ -25,6 +25,7 @@ import {
   ApiBadRequestResponse,
   ApiQuery,
   ApiParam,
+  ApiTooManyRequestsResponse,
 } from '@nestjs/swagger';
 import { UserEducationService } from './user-education.service';
 import { CreateUserEducationDto } from './dto/create-user-education.dto';
@@ -66,6 +67,7 @@ export class UserEducationController {
   @ApiBadRequestResponse({ description: 'Invalid input data or validation failed.' })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })
   @ApiForbiddenResponse({ description: 'Candidate role required.' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
   @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   async create(
     @Req() request: Request & { user?: JwtPayload },
@@ -107,6 +109,7 @@ export class UserEducationController {
   })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })
   @ApiForbiddenResponse({ description: 'Candidate role required.' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
   @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   async findAll(
     @Req() request: Request & { user?: JwtPayload },
@@ -151,6 +154,7 @@ export class UserEducationController {
   @ApiNotFoundResponse({ description: 'User education not found.' })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })
   @ApiForbiddenResponse({ description: 'Candidate role required.' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
   @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   async findOne(
     @Req() request: Request & { user?: JwtPayload },
@@ -183,6 +187,7 @@ export class UserEducationController {
   @ApiNotFoundResponse({ description: 'User education not found.' })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })
   @ApiForbiddenResponse({ description: 'Candidate role required.' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
   @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   async update(
     @Req() request: Request & { user?: JwtPayload },
@@ -211,6 +216,7 @@ export class UserEducationController {
   @ApiNotFoundResponse({ description: 'User education not found.' })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })
   @ApiForbiddenResponse({ description: 'Candidate role required.' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
   @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   async remove(
     @Req() request: Request & { user?: JwtPayload },

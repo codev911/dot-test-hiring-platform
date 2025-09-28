@@ -23,6 +23,9 @@ import {
   ApiForbiddenResponse,
   ApiQuery,
   ApiParam,
+  ApiBadRequestResponse,
+  ApiTooManyRequestsResponse,
+  ApiInternalServerErrorResponse,
 } from '@nestjs/swagger';
 import { UserSkillService } from './user-skill.service';
 import { CreateUserSkillDto } from './dto/create-user-skill.dto';
@@ -58,8 +61,11 @@ export class UserSkillController {
     description: 'User skill created successfully.',
     type: UserSkillResponseDto,
   })
+  @ApiBadRequestResponse({ description: 'Invalid input data or validation failed.' })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })
   @ApiForbiddenResponse({ description: 'Candidate role required.' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   async create(
     @Req() request: Request & { user?: JwtPayload },
     @Body() createUserSkillDto: CreateUserSkillDto,
@@ -100,6 +106,8 @@ export class UserSkillController {
   })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })
   @ApiForbiddenResponse({ description: 'Candidate role required.' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   async findAll(
     @Req() request: Request & { user?: JwtPayload },
     @Query('page') page = 1,
@@ -140,6 +148,8 @@ export class UserSkillController {
   @ApiNotFoundResponse({ description: 'User skill not found.' })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })
   @ApiForbiddenResponse({ description: 'Candidate role required.' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   async findOne(
     @Req() request: Request & { user?: JwtPayload },
     @Param('id') id: string,
@@ -164,9 +174,12 @@ export class UserSkillController {
   @ApiOperation({ summary: 'Update a user skill' })
   @ApiParam({ name: 'id', description: 'User skill ID' })
   @ApiOkResponse({ description: 'User skill updated successfully.', type: UserSkillResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid input data or validation failed.' })
   @ApiNotFoundResponse({ description: 'User skill not found.' })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })
   @ApiForbiddenResponse({ description: 'Candidate role required.' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   async update(
     @Req() request: Request & { user?: JwtPayload },
     @Param('id') id: string,
@@ -194,6 +207,8 @@ export class UserSkillController {
   @ApiNotFoundResponse({ description: 'User skill not found.' })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })
   @ApiForbiddenResponse({ description: 'Candidate role required.' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   async remove(
     @Req() request: Request & { user?: JwtPayload },
     @Param('id') id: string,

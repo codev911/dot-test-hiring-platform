@@ -17,9 +17,11 @@ import {
   ApiNotFoundResponse,
   ApiOperation,
   ApiParam,
-  ApiResponse,
+  ApiOkResponse,
   ApiTags,
   ApiUnauthorizedResponse,
+  ApiTooManyRequestsResponse,
+  ApiInternalServerErrorResponse,
 } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { CandidateAuthGuard } from '../common/guards/candidate-auth.guard';
@@ -65,14 +67,15 @@ export class UserSitesController {
     description:
       'Create a new user site or update existing one based on site type. Each user can have only one site per type.',
   })
-  @ApiResponse({
-    status: 200,
-    description: 'Site upserted successfully',
+  @ApiOkResponse({
+    description: 'Site upserted successfully.',
     type: UserSiteResponseDto,
   })
   @ApiBadRequestResponse({ description: 'Invalid input data' })
   @ApiUnauthorizedResponse({ description: 'User not authenticated' })
   @ApiNotFoundResponse({ description: 'User not found' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   async upsert(
     @Req() request: Request & { user?: JwtPayload },
     @Body() upsertUserSiteDto: UpsertUserSiteDto,
@@ -93,9 +96,8 @@ export class UserSitesController {
     summary: 'Get all user sites',
     description: 'Retrieve all sites for the authenticated user.',
   })
-  @ApiResponse({
-    status: 200,
-    description: 'Sites retrieved successfully',
+  @ApiOkResponse({
+    description: 'Sites retrieved successfully.',
     schema: {
       type: 'object',
       properties: {
@@ -108,6 +110,8 @@ export class UserSitesController {
     },
   })
   @ApiUnauthorizedResponse({ description: 'User not authenticated' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   async findAll(
     @Req() request: Request & { user?: JwtPayload },
   ): Promise<{ message: string; data: UserSiteResponseDto[] }> {
@@ -132,13 +136,14 @@ export class UserSitesController {
     description: 'Type of the site to retrieve',
     enum: UserWebsite,
   })
-  @ApiResponse({
-    status: 200,
-    description: 'Site retrieved successfully',
+  @ApiOkResponse({
+    description: 'Site retrieved successfully.',
     type: UserSiteResponseDto,
   })
   @ApiUnauthorizedResponse({ description: 'User not authenticated' })
   @ApiNotFoundResponse({ description: 'Site not found' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   async findBySiteType(
     @Req() request: Request & { user?: JwtPayload },
     @Param('siteType') siteType: UserWebsite,
@@ -164,9 +169,8 @@ export class UserSitesController {
     description: 'Type of the site to delete',
     enum: UserWebsite,
   })
-  @ApiResponse({
-    status: 200,
-    description: 'Site deleted successfully',
+  @ApiOkResponse({
+    description: 'Site deleted successfully.',
     schema: {
       type: 'object',
       properties: {
@@ -176,6 +180,8 @@ export class UserSitesController {
   })
   @ApiUnauthorizedResponse({ description: 'User not authenticated' })
   @ApiNotFoundResponse({ description: 'Site not found' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   async remove(
     @Req() request: Request & { user?: JwtPayload },
     @Param('siteType') siteType: UserWebsite,

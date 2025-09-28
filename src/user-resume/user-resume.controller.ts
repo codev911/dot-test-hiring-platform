@@ -26,6 +26,7 @@ import {
   ApiUnsupportedMediaTypeResponse,
   ApiBadRequestResponse,
   ApiNotFoundResponse,
+  ApiTooManyRequestsResponse,
 } from '@nestjs/swagger';
 import { UserResumeService } from './user-resume.service';
 import { UploadResumeDto } from './dto/upload-resume.dto';
@@ -58,6 +59,7 @@ export class UserResumeController {
   @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })
   @ApiForbiddenResponse({ description: 'Candidate role required.' })
   @ApiNotFoundResponse({ description: 'User not found.' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
   @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   async getResume(
     @Req() request: Request & { user?: JwtPayload },
@@ -84,6 +86,7 @@ export class UserResumeController {
   @ApiNotFoundResponse({ description: 'User not found.' })
   @ApiUnsupportedMediaTypeResponse({ description: 'File must be a PDF document.' })
   @ApiPayloadTooLargeResponse({ description: 'File must be <= 10MB.' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
   @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   @UseInterceptors(FileInterceptor('resume'))
   uploadResume(

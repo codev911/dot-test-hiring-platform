@@ -23,6 +23,9 @@ import {
   ApiForbiddenResponse,
   ApiQuery,
   ApiParam,
+  ApiBadRequestResponse,
+  ApiTooManyRequestsResponse,
+  ApiInternalServerErrorResponse,
 } from '@nestjs/swagger';
 import { UserExperienceService } from './user-experience.service';
 import { CreateUserExperienceDto } from './dto/create-user-experience.dto';
@@ -61,8 +64,11 @@ export class UserExperienceController {
     description: 'User experience created successfully.',
     type: UserExperienceResponseDto,
   })
+  @ApiBadRequestResponse({ description: 'Invalid input data or validation failed.' })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })
   @ApiForbiddenResponse({ description: 'Candidate role required.' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   async create(
     @Req() request: Request & { user?: JwtPayload },
     @Body() createUserExperienceDto: CreateUserExperienceDto,
@@ -103,6 +109,8 @@ export class UserExperienceController {
   })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })
   @ApiForbiddenResponse({ description: 'Candidate role required.' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   async findAll(
     @Req() request: Request & { user?: JwtPayload },
     @Query('page') page = 1,
@@ -150,6 +158,8 @@ export class UserExperienceController {
   @ApiNotFoundResponse({ description: 'User experience not found.' })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })
   @ApiForbiddenResponse({ description: 'Candidate role required.' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   async findOne(
     @Req() request: Request & { user?: JwtPayload },
     @Param('id') id: string,
@@ -177,9 +187,12 @@ export class UserExperienceController {
     description: 'User experience updated successfully.',
     type: UserExperienceResponseDto,
   })
+  @ApiBadRequestResponse({ description: 'Invalid input data or validation failed.' })
   @ApiNotFoundResponse({ description: 'User experience not found.' })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })
   @ApiForbiddenResponse({ description: 'Candidate role required.' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   async update(
     @Req() request: Request & { user?: JwtPayload },
     @Param('id') id: string,
@@ -207,6 +220,8 @@ export class UserExperienceController {
   @ApiNotFoundResponse({ description: 'User experience not found.' })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })
   @ApiForbiddenResponse({ description: 'Candidate role required.' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   async remove(
     @Req() request: Request & { user?: JwtPayload },
     @Param('id') id: string,

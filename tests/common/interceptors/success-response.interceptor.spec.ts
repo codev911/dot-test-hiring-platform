@@ -93,6 +93,22 @@ describe('SuccessResponseInterceptor', () => {
     });
   });
 
+  it('ignores invalid pagination shapes', async () => {
+    const interceptor = new SuccessResponseInterceptor();
+    const context = createContext(HttpStatus.OK);
+    const handler = {
+      handle: () => of({ message: 'List', pagination: { page: 1, limit: 10 } }),
+    } as CallHandler;
+
+    const result = await lastValueFrom(interceptor.intercept(context, handler));
+
+    expect(result).toEqual({
+      statusCode: HttpStatus.OK,
+      message: 'List',
+      data: { pagination: { page: 1, limit: 10 } },
+    });
+  });
+
   it('retains nested data while merging remaining keys', async () => {
     const interceptor = new SuccessResponseInterceptor();
     const context = createContext(HttpStatus.OK);

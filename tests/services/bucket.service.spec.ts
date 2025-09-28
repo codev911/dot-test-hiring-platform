@@ -340,6 +340,35 @@ describe('BucketService', () => {
     );
   });
 
+  it('replaces policy when existing differs from expected', async () => {
+    // existing policy: missing ListBucket action, causing a diff
+    bucketPolicy = JSON.stringify({
+      Version: '2012-10-17',
+      Statement: [
+        {
+          Sid: 'AllowPublicListBucket',
+          Effect: 'Allow',
+          Principal: '*',
+          Action: ['s3:GetBucketLocation'],
+          Resource: 'arn:aws:s3:::bucket',
+        },
+      ],
+    });
+
+    const service = createService();
+
+    await service.ensureBucket();
+
+    expect(sendMock).toHaveBeenNthCalledWith(1, expect.any(HeadBucketCommand));
+    expect(sendMock).toHaveBeenNthCalledWith(2, expect.any(GetBucketPolicyCommand));
+    expect(sendMock).toHaveBeenNthCalledWith(3, expect.any(PutBucketPolicyCommand));
+
+    const logger = (service as unknown as { logger: { warn: jest.Mock } }).logger;
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('policy differs from expected'),
+    );
+  });
+
   it('throws when fetching policy fails unexpectedly', async () => {
     sendMock.mockImplementation((command: unknown) => {
       if (command instanceof HeadBucketCommand) {

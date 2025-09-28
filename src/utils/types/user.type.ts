@@ -126,3 +126,14 @@ export type PaginatedUserCertificationsData = {
   limit: number;
   totalPage: number;
 };
+
+/**
+ * Shape describing user site information returned to clients.
+ */
+export type UserSiteData = {
+  id: string;
+  siteType: string;
+  url: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+};

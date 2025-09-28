@@ -8,6 +8,7 @@ import {
   ApiForbiddenResponse,
   ApiInternalServerErrorResponse,
   ApiOkResponse,
+  ApiOperation,
   ApiTags,
   ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
@@ -76,6 +77,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
+  @ApiOperation({ summary: 'Register a new candidate account' })
   @ApiBody({ type: RegisterUserDto })
   @ApiCreatedResponse({
     description: 'Candidate registered.',
@@ -102,6 +104,7 @@ export class AuthController {
   }
 
   @Post('login')
+  @ApiOperation({ summary: 'Login as candidate' })
   @ApiBody({ type: LoginDto })
   @ApiOkResponse({
     description: 'Candidate login successful.',
@@ -126,6 +129,7 @@ export class AuthController {
   }
 
   @Post('recruiter/login')
+  @ApiOperation({ summary: 'Login as recruiter' })
   @ApiBody({ type: LoginDto })
   @ApiOkResponse({
     description: 'Recruiter login successful.',
@@ -152,6 +156,7 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
+  @ApiOperation({ summary: 'Get authenticated user profile' })
   @ApiBearerAuth('bearer')
   @ApiOkResponse({
     description: 'Authenticated user profile.',

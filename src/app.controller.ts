@@ -1,5 +1,11 @@
 import { Controller, Get } from '@nestjs/common';
-import { ApiOkResponse, ApiTags, ApiTooManyRequestsResponse } from '@nestjs/swagger';
+import {
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+  ApiTooManyRequestsResponse,
+  ApiInternalServerErrorResponse,
+} from '@nestjs/swagger';
 import { AppService } from './app.service';
 
 /**
@@ -21,6 +27,7 @@ export class AppController {
    * @returns Greeting that signals the API is responsive.
    */
   @Get()
+  @ApiOperation({ summary: 'API health check' })
   @ApiOkResponse({
     description: 'API heartbeat response.',
     schema: {
@@ -29,6 +36,7 @@ export class AppController {
     },
   })
   @ApiTooManyRequestsResponse({ description: 'Too many requests. Please slow down.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   getHello(): string {
     return this.appService.getHello();
   }

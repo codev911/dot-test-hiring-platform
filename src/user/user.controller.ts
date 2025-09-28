@@ -19,10 +19,13 @@ import {
   ApiBody,
   ApiConsumes,
   ApiOkResponse,
+  ApiOperation,
   ApiTags,
   ApiUnauthorizedResponse,
   ApiUnsupportedMediaTypeResponse,
   ApiInternalServerErrorResponse,
+  ApiBadRequestResponse,
+  ApiPayloadTooLargeResponse,
 } from '@nestjs/swagger';
 import { UserService } from './user.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -52,7 +55,10 @@ export class UserController {
    * @returns Confirmation message that the password was updated.
    */
   @Patch('change-password')
+  @ApiOperation({ summary: 'Change user password' })
+  @ApiBody({ type: ChangePasswordDto, description: 'Password change payload' })
   @ApiOkResponse({ description: 'Password updated successfully.' })
+  @ApiBadRequestResponse({ description: 'Invalid current password or validation failed.' })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })
   @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   changePassword(
@@ -71,10 +77,14 @@ export class UserController {
    * @returns Response containing the avatar URL.
    */
   @Put('avatar')
+  @ApiOperation({ summary: 'Upload or update user avatar' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({ description: 'Avatar upload payload.', type: UploadAvatarDto })
   @ApiOkResponse({ description: 'Avatar uploaded successfully.', type: AvatarResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid file or validation failed.' })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })
   @ApiUnsupportedMediaTypeResponse({ description: 'File must be an image (PNG, JPG, GIF, WEBP).' })
+  @ApiPayloadTooLargeResponse({ description: 'File must be <= 2MB.' })
   @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   @UseInterceptors(FileInterceptor('avatar'))
   updateAvatar(
@@ -100,6 +110,7 @@ export class UserController {
    * @returns Response containing the avatar URL or null when none exists.
    */
   @Get('avatar')
+  @ApiOperation({ summary: 'Get user avatar URL' })
   @ApiOkResponse({ description: 'Avatar retrieved successfully.', type: AvatarResponseDto })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })
   @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })

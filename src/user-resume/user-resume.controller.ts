@@ -17,12 +17,15 @@ import {
   ApiBody,
   ApiConsumes,
   ApiOkResponse,
+  ApiOperation,
   ApiTags,
   ApiUnauthorizedResponse,
   ApiForbiddenResponse,
   ApiInternalServerErrorResponse,
   ApiPayloadTooLargeResponse,
   ApiUnsupportedMediaTypeResponse,
+  ApiBadRequestResponse,
+  ApiNotFoundResponse,
 } from '@nestjs/swagger';
 import { UserResumeService } from './user-resume.service';
 import { UploadResumeDto } from './dto/upload-resume.dto';
@@ -50,9 +53,11 @@ export class UserResumeController {
    * @returns Response containing the resume URL or null if no resume uploaded.
    */
   @Get()
+  @ApiOperation({ summary: 'Get user resume URL' })
   @ApiOkResponse({ description: 'Resume retrieved successfully.', type: ResumeResponseDto })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })
   @ApiForbiddenResponse({ description: 'Candidate role required.' })
+  @ApiNotFoundResponse({ description: 'User not found.' })
   @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   async getResume(
     @Req() request: Request & { user?: JwtPayload },
@@ -69,11 +74,14 @@ export class UserResumeController {
    * @returns Response containing the resume URL.
    */
   @Post()
+  @ApiOperation({ summary: 'Upload or replace user resume' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({ description: 'Resume upload payload.', type: UploadResumeDto })
   @ApiOkResponse({ description: 'Resume uploaded successfully.', type: ResumeResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid file or validation failed.' })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })
   @ApiForbiddenResponse({ description: 'Candidate role required.' })
+  @ApiNotFoundResponse({ description: 'User not found.' })
   @ApiUnsupportedMediaTypeResponse({ description: 'File must be a PDF document.' })
   @ApiPayloadTooLargeResponse({ description: 'File must be <= 10MB.' })
   @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })

@@ -98,21 +98,16 @@ export class JobApplicationService {
       throw new ConflictException('You have already applied to this job posting.');
     }
 
-    // Validate resume if provided
-    if (dto.resumeId) {
-      const resume = await this.userResumeRepository.findOne({
-        where: { id: dto.resumeId, userId: candidateId },
-      });
-
-      if (!resume) {
-        throw new NotFoundException('Resume not found or does not belong to you.');
-      }
-    }
+    // Auto-select candidate's latest resume (if any)
+    const latestResume = await this.userResumeRepository.findOne({
+      where: { userId: candidateId },
+      order: { createdAt: 'DESC' },
+    });
 
     const application = this.jobApplicationRepository.create({
       jobId: dto.jobId,
       candidateId,
-      resumeId: dto.resumeId,
+      resumeId: latestResume?.id,
       coverLetter: dto.coverLetter,
       expectedSalary: dto.expectedSalary,
       salaryCurrency: dto.salaryCurrency,
@@ -716,6 +711,36 @@ export class JobApplicationService {
     );
     await this.cache.invalidateIndex(
       buildCacheKey('idx', 'http', 'job-application', 'recruiter', 'detail', companyRecruiterId),
+    );
+
+    // Invalidate candidate caches (list + detail + HTTP indices)
+    await this.cache.del(
+      buildCacheKey(
+        'job-application',
+        'candidate',
+        'detail',
+        application.candidateId,
+        applicationId,
+      ),
+    );
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'job-application', 'candidate', 'list', application.candidateId),
+    );
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'job-application', 'candidate', 'list', application.candidateId),
+    );
+    await this.cache.del(
+      buildHttpCacheKeyForUserPath(application.candidateId, '/job-application/my-applications'),
+    );
+    await this.cache.invalidateIndex(
+      buildCacheKey(
+        'idx',
+        'http',
+        'job-application',
+        'candidate',
+        'detail',
+        application.candidateId,
+      ),
     );
 
     const noteWithAuthor = await this.jobApplicationNoteRepository.findOne({

@@ -10,11 +10,6 @@ export class CreateJobApplicationDto {
   @IsString()
   jobId: string;
 
-  @ApiPropertyOptional({ description: 'Resume ID to attach to application', example: '456' })
-  @IsOptional()
-  @IsString()
-  resumeId?: string;
-
   @ApiPropertyOptional({ description: 'Cover letter content', example: 'I am excited to apply...' })
   @IsOptional()
   @IsString()

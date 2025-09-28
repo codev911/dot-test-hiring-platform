@@ -154,15 +154,28 @@ describe('JobApplicationService', () => {
       ).rejects.toBeInstanceOf(Error);
     });
 
-    it('throws NotFound when resumeId provided but resume not found', async () => {
+    it('auto-selects latest resume if available and continues when none', async () => {
       (postingRepo.findOne as jest.Mock).mockResolvedValue(
         Object.assign(new JobPosting(), { id: jobId, isPublished: true }),
       );
       (applicationRepo.findOne as jest.Mock).mockResolvedValue(null);
+      // no resume found
       (resumeRepo.findOne as jest.Mock).mockResolvedValue(null);
-      await expect(
-        service.createJobApplication(candidateId, { jobId, resumeId: 'res-1' } as any),
-      ).rejects.toBeInstanceOf(NotFoundException);
+      (applicationRepo.create as jest.Mock).mockImplementation((v) =>
+        Object.assign(new JobApplication(), v),
+      );
+      (applicationRepo.save as jest.Mock).mockImplementation((a) =>
+        Promise.resolve(Object.assign(makeApplication(), a, { id: appId })),
+      );
+      (eventRepo.create as jest.Mock).mockImplementation((v) =>
+        Object.assign(new JobApplicationEvent(), v),
+      );
+      (eventRepo.save as jest.Mock).mockResolvedValue(
+        Object.assign(new JobApplicationEvent(), { id: 'e1' }),
+      );
+      const result = await service.createJobApplication(candidateId, { jobId } as any);
+      expect(result.id).toBe(appId);
+      expect(applicationRepo.save).toHaveBeenCalled();
     });
   });
 

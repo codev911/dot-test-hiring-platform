@@ -16,6 +16,7 @@ import { SuccessResponseInterceptor } from './common/interceptors/success-respon
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
 import { BucketModule } from './services/bucket.module';
+import { UserResumeModule } from './user-resume/user-resume.module';
 
 /**
  * Root NestJS module that wires together controllers and providers for the application runtime.
@@ -67,6 +68,7 @@ import { BucketModule } from './services/bucket.module';
     AuthModule,
     UserModule,
     BucketModule,
+    UserResumeModule,
   ],
   controllers: [AppController],
   providers: [

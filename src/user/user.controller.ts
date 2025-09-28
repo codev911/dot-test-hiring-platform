@@ -22,6 +22,7 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
   ApiUnsupportedMediaTypeResponse,
+  ApiInternalServerErrorResponse,
 } from '@nestjs/swagger';
 import { UserService } from './user.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -50,8 +51,10 @@ export class UserController {
    * @param dto Password change payload.
    * @returns Confirmation message that the password was updated.
    */
-  @Patch('password')
+  @Patch('change-password')
   @ApiOkResponse({ description: 'Password updated successfully.' })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   changePassword(
     @Req() request: Request & { user?: JwtPayload },
     @Body() dto: ChangePasswordDto,
@@ -72,6 +75,7 @@ export class UserController {
   @ApiBody({ description: 'Avatar upload payload.', type: UploadAvatarDto })
   @ApiOkResponse({ description: 'Avatar uploaded successfully.', type: AvatarResponseDto })
   @ApiUnsupportedMediaTypeResponse({ description: 'File must be an image (PNG, JPG, GIF, WEBP).' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   @UseInterceptors(FileInterceptor('avatar'))
   updateAvatar(
     @Req() request: Request & { user?: JwtPayload },
@@ -98,6 +102,7 @@ export class UserController {
   @Get('avatar')
   @ApiOkResponse({ description: 'Avatar retrieved successfully.', type: AvatarResponseDto })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected error.' })
   getAvatar(
     @Req() request: Request & { user?: JwtPayload },
   ): Promise<{ message: string; data: { avatarUrl: string | null } }> {

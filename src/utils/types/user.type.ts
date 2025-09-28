@@ -11,3 +11,10 @@ export type UserAvatarData = {
 export type PasswordChangeData = {
   userId: string;
 };
+
+/**
+ * Shape describing resume information returned to clients.
+ */
+export type UserResumeData = {
+  resumeUrl: string | null;
+};

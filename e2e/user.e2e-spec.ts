@@ -75,7 +75,7 @@ describe('UserController (e2e)', () => {
         deleteObject: jest.fn(async (_key: string): Promise<void> => {
           return;
         }),
-        getPublicUrl: jest.fn((_key: string) => 'http://localhost:9000/bucket/profile/user-1.png'),
+        getPublicUrl: jest.fn((key: string) => `http://localhost:9000/bucket/${key}`),
       } satisfies Partial<jest.Mocked<BucketService>>);
 
     const moduleFixture = await moduleBuilder.compile();

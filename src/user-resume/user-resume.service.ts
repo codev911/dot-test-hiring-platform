@@ -1,0 +1,73 @@
+import path from 'node:path';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import type { Repository } from 'typeorm';
+import { User } from '../entities/user.entity';
+import { UserResume } from '../entities/user-resume.entity';
+import { BucketService } from '../services/bucket.service';
+import type { UserResumeData } from '../utils/types/user.type';
+import type { PutObjectCommandInput } from '@aws-sdk/client-s3';
+
+/**
+ * Application service that encapsulates user resume management tasks.
+ */
+@Injectable()
+export class UserResumeService {
+  /**
+   * Construct the service with persistence and storage dependencies.
+   *
+   * @param userRepository TypeORM repository managing {@link User} entities.
+   * @param userResumeRepository TypeORM repository managing {@link UserResume} entities.
+   * @param bucketService Service responsible for interacting with object storage.
+   */
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    @InjectRepository(UserResume)
+    private readonly userResumeRepository: Repository<UserResume>,
+    private readonly bucketService: BucketService,
+  ) {}
+
+  /**
+   * Upload or replace the user's resume in object storage and persist the new key.
+   *
+   * @param userId Identifier of the account whose resume is being updated.
+   * @param file Uploaded PDF resume file captured by Multer.
+   * @returns Response containing the new resume URL.
+   * @throws NotFoundException When the user cannot be located.
+   */
+  async uploadResume(
+    userId: string,
+    file: Express.Multer.File,
+  ): Promise<{ message: string; data: UserResumeData }> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+
+    if (!user) {
+      throw new NotFoundException('User not found.');
+    }
+
+    const key = path.posix.join('resume', `${userId}.pdf`);
+
+    const existing = await this.userResumeRepository.findOne({ where: { userId } });
+    if (existing && existing.resumePath && existing.resumePath !== key) {
+      await this.bucketService.deleteObject(existing.resumePath);
+    }
+
+    await this.bucketService.uploadObject(
+      key,
+      file.buffer as unknown as PutObjectCommandInput['Body'],
+      'application/pdf',
+    );
+
+    const record = existing ?? this.userResumeRepository.create({ userId, resumePath: key });
+    record.resumePath = key;
+    await this.userResumeRepository.save(record);
+
+    return {
+      message: 'Resume uploaded successfully.',
+      data: {
+        resumeUrl: String(this.bucketService.getPublicUrl(key)),
+      },
+    };
+  }
+}

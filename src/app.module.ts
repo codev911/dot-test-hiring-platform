@@ -20,6 +20,7 @@ import { UserResumeModule } from './user-resume/user-resume.module';
 import { UserSkillModule } from './user-skill/user-skill.module';
 import { UserEducationModule } from './user-education/user-education.module';
 import { UserExperienceModule } from './user-experience/user-experience.module';
+import { UserCertificationModule } from './user-certification/user-certification.module';
 
 /**
  * Root NestJS module that wires together controllers and providers for the application runtime.
@@ -75,6 +76,7 @@ import { UserExperienceModule } from './user-experience/user-experience.module';
     UserSkillModule,
     UserEducationModule,
     UserExperienceModule,
+    UserCertificationModule,
   ],
   controllers: [AppController],
   providers: [

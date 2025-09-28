@@ -97,3 +97,32 @@ export type PaginatedUserExperiencesData = {
   limit: number;
   totalPage: number;
 };
+
+/**
+ * Shape describing user certification information returned to clients.
+ */
+export type UserCertificationData = {
+  id: string;
+  certificationName: string;
+  issuingOrganization: string;
+  issuedMonth?: string;
+  issuedYear: number;
+  expiredMonth?: string;
+  expiredYear?: number;
+  certificationId?: string;
+  certificationUrl?: string;
+  certificateUrl?: string | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+};
+
+/**
+ * Paginated response for user certifications.
+ */
+export type PaginatedUserCertificationsData = {
+  data: UserCertificationData[];
+  totalData: number;
+  page: number;
+  limit: number;
+  totalPage: number;
+};

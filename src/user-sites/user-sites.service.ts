@@ -9,6 +9,8 @@ import { UpsertUserSiteDto } from './dto/upsert-user-site.dto';
 import type { UserSiteData } from '../utils/types/user.type';
 import { withTransaction } from '../utils/database/transaction.util';
 import { Optional } from '@nestjs/common';
+import { CacheHelperService } from '../utils/cache/cache.service';
+import { buildCacheKey, buildHttpCacheKeyForUserPath } from '../utils/cache/cache.util';
 
 /**
  * Application service that encapsulates user site management tasks.
@@ -27,6 +29,7 @@ export class UserSitesService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(UserSites)
     private readonly userSitesRepository: Repository<UserSites>,
+    private readonly cache: CacheHelperService,
     @Optional() private readonly dataSource?: DataSource,
   ) {}
 
@@ -61,6 +64,12 @@ export class UserSitesService {
         const repo = em ? em.getRepository(UserSites) : this.userSitesRepository;
         return repo.save(existingSite);
       });
+      await this.cache.del(
+        buildCacheKey('user', 'sites', 'detail', userId, upsertUserSiteDto.siteType),
+      );
+      await this.cache.del(
+        buildHttpCacheKeyForUserPath(userId, `/user/sites/${upsertUserSiteDto.siteType}`),
+      );
     } else {
       // Create new site
       const newSite = this.userSitesRepository.create({
@@ -74,6 +83,12 @@ export class UserSitesService {
       });
     }
 
+    // Invalidate list (all paginated variants tracked under index) and existing detail key
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'user', 'sites', 'list', userId));
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'http', 'user', 'sites', 'list', userId));
+    // Also clear the base HTTP key (no query params)
+    await this.cache.del(buildHttpCacheKeyForUserPath(userId, '/user/sites'));
+
     return this.mapToUserSiteData(userSite);
   }
 
@@ -84,12 +99,25 @@ export class UserSitesService {
    * @returns Array of user sites.
    */
   async findAll(userId: string): Promise<UserSiteData[]> {
-    const sites = await this.userSitesRepository.find({
-      where: { userId },
-      order: { createdAt: 'DESC' },
-    });
+    const key = buildCacheKey('user', 'sites', 'list', userId);
+    const indexKey = buildCacheKey('idx', 'user', 'sites', 'list', userId);
+    const httpIndexKey = buildCacheKey('idx', 'http', 'user', 'sites', 'list', userId);
+    const httpKey = buildHttpCacheKeyForUserPath(userId, '/user/sites');
+    const result = await this.cache.rememberList(
+      indexKey,
+      key,
+      async () => {
+        const sites = await this.userSitesRepository.find({
+          where: { userId },
+          order: { createdAt: 'DESC' },
+        });
 
-    return sites.map((site) => this.mapToUserSiteData(site));
+        return sites.map((site) => this.mapToUserSiteData(site));
+      },
+      300_000,
+    );
+    await this.cache.trackKey(httpIndexKey, httpKey);
+    return result;
   }
 
   /**
@@ -101,15 +129,22 @@ export class UserSitesService {
    * @throws NotFoundException When the site cannot be located or doesn't belong to the user.
    */
   async findBySiteType(userId: string, siteType: UserWebsite): Promise<UserSiteData> {
-    const site = await this.userSitesRepository.findOne({
-      where: { userId, siteType },
-    });
+    const key = buildCacheKey('user', 'sites', 'detail', userId, siteType);
+    return this.cache.getOrSet(
+      key,
+      async () => {
+        const site = await this.userSitesRepository.findOne({
+          where: { userId, siteType },
+        });
 
-    if (!site) {
-      throw new NotFoundException('User site not found.');
-    }
+        if (!site) {
+          throw new NotFoundException('User site not found.');
+        }
 
-    return this.mapToUserSiteData(site);
+        return this.mapToUserSiteData(site);
+      },
+      300_000,
+    );
   }
 
   /**
@@ -133,6 +168,13 @@ export class UserSitesService {
       await repo.remove(site);
       return undefined;
     });
+
+    await this.cache.del(buildCacheKey('user', 'sites', 'detail', userId, siteType));
+    await this.cache.del(buildHttpCacheKeyForUserPath(userId, `/user/sites/${siteType}`));
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'user', 'sites', 'list', userId));
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'http', 'user', 'sites', 'list', userId));
+    // Also clear the base HTTP key (no query params)
+    await this.cache.del(buildHttpCacheKeyForUserPath(userId, '/user/sites'));
   }
 
   /**

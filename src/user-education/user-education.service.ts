@@ -9,6 +9,8 @@ import { UpdateUserEducationDto } from './dto/update-user-education.dto';
 import type { UserEducationData, PaginatedUserEducationsData } from '../utils/types/user.type';
 import { withTransaction } from '../utils/database/transaction.util';
 import { Optional } from '@nestjs/common';
+import { CacheHelperService } from '../utils/cache/cache.service';
+import { buildCacheKey, buildHttpCacheKeyForUserPath } from '../utils/cache/cache.util';
 
 /**
  * Application service that encapsulates user education management tasks.
@@ -26,6 +28,7 @@ export class UserEducationService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(UserEducation)
     private readonly userEducationRepository: Repository<UserEducation>,
+    private readonly cache: CacheHelperService,
     @Optional() private readonly dataSource?: DataSource,
   ) {}
 
@@ -56,6 +59,13 @@ export class UserEducationService {
       const repo = em ? em.getRepository(UserEducation) : this.userEducationRepository;
       return repo.save(userEducation);
     });
+
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'user', 'education', 'list', userId));
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'user', 'education', 'list', userId),
+    );
+    // Also clear the base HTTP key (no query params)
+    await this.cache.del(buildHttpCacheKeyForUserPath(userId, '/user/education'));
     return this.mapToUserEducationData(savedEducation);
   }
 
@@ -68,22 +78,35 @@ export class UserEducationService {
    * @returns Paginated user educations data.
    */
   async findAll(userId: string, page = 1, limit = 10): Promise<PaginatedUserEducationsData> {
-    const [educations, total] = await this.userEducationRepository.findAndCount({
-      where: { userId },
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    const key = buildCacheKey('user', 'education', 'list', userId, page, limit);
+    const indexKey = buildCacheKey('idx', 'user', 'education', 'list', userId);
+    const httpIndexKey = buildCacheKey('idx', 'http', 'user', 'education', 'list', userId);
+    const httpKey = buildHttpCacheKeyForUserPath(userId, '/user/education', { page, limit });
+    const result = await this.cache.rememberList(
+      indexKey,
+      key,
+      async () => {
+        const [educations, total] = await this.userEducationRepository.findAndCount({
+          where: { userId },
+          order: { createdAt: 'DESC' },
+          skip: (page - 1) * limit,
+          take: limit,
+        });
 
-    const totalPage = Math.ceil(total / limit);
+        const totalPage = Math.ceil(total / limit);
 
-    return {
-      data: educations.map((education) => this.mapToUserEducationData(education)),
-      totalData: total,
-      page,
-      limit,
-      totalPage,
-    };
+        return {
+          data: educations.map((education) => this.mapToUserEducationData(education)),
+          totalData: total,
+          page,
+          limit,
+          totalPage,
+        };
+      },
+      300_000,
+    );
+    await this.cache.trackKey(httpIndexKey, httpKey);
+    return result;
   }
 
   /**
@@ -95,15 +118,22 @@ export class UserEducationService {
    * @throws NotFoundException When the education cannot be located or doesn't belong to the user.
    */
   async findOne(userId: string, id: string): Promise<UserEducationData> {
-    const education = await this.userEducationRepository.findOne({
-      where: { id, userId },
-    });
+    const key = buildCacheKey('user', 'education', 'detail', userId, id);
+    return this.cache.getOrSet(
+      key,
+      async () => {
+        const education = await this.userEducationRepository.findOne({
+          where: { id, userId },
+        });
 
-    if (!education) {
-      throw new NotFoundException('User education not found.');
-    }
+        if (!education) {
+          throw new NotFoundException('User education not found.');
+        }
 
-    return this.mapToUserEducationData(education);
+        return this.mapToUserEducationData(education);
+      },
+      300_000,
+    );
   }
 
   /**
@@ -134,6 +164,15 @@ export class UserEducationService {
       return repo.save(education);
     });
 
+    await this.cache.del(buildCacheKey('user', 'education', 'detail', userId, id));
+    await this.cache.del(buildHttpCacheKeyForUserPath(userId, `/user/education/${id}`));
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'user', 'education', 'list', userId));
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'user', 'education', 'list', userId),
+    );
+    // Also clear the base HTTP key (no query params)
+    await this.cache.del(buildHttpCacheKeyForUserPath(userId, '/user/education'));
+
     return this.mapToUserEducationData(updatedEducation);
   }
 
@@ -158,6 +197,15 @@ export class UserEducationService {
       await repo.remove(education);
       return undefined;
     });
+
+    await this.cache.del(buildCacheKey('user', 'education', 'detail', userId, id));
+    await this.cache.del(buildHttpCacheKeyForUserPath(userId, `/user/education/${id}`));
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'user', 'education', 'list', userId));
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'user', 'education', 'list', userId),
+    );
+    // Also clear the base HTTP key (no query params)
+    await this.cache.del(buildHttpCacheKeyForUserPath(userId, '/user/education'));
   }
 
   /**

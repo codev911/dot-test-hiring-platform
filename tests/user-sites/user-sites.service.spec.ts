@@ -5,6 +5,7 @@ import type { Repository } from 'typeorm';
 import { UserSitesService } from '../../src/user-sites/user-sites.service';
 import { UserSites } from '../../src/entities/user-sites.entity';
 import { User } from '../../src/entities/user.entity';
+import { CacheHelperService } from '../../src/utils/cache/cache.service';
 import { UserWebsite } from '../../src/utils/enums/user-website.enum';
 import { UpsertUserSiteDto } from '../../src/user-sites/dto/upsert-user-site.dto';
 import type { UserSiteData } from '../../src/utils/types/user.type';
@@ -47,6 +48,10 @@ describe('UserSitesService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UserSitesService,
+        {
+          provide: CacheHelperService,
+          useValue: { getOrSet: jest.fn((_k: string, s: any) => s()), del: jest.fn() },
+        },
         {
           provide: getRepositoryToken(User),
           useValue: {

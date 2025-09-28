@@ -5,6 +5,7 @@ import type { Repository } from 'typeorm';
 import { UserExperienceService } from '../../src/user-experience/user-experience.service';
 import { UserExperience } from '../../src/entities/user-experience.entity';
 import { User } from '../../src/entities/user.entity';
+import { CacheHelperService } from '../../src/utils/cache/cache.service';
 import { JobType } from '../../src/utils/enums/job-type.enum';
 import { JobLocation } from '../../src/utils/enums/job-location.enum';
 import { Month } from '../../src/utils/enums/month.enum';
@@ -57,6 +58,10 @@ describe('UserExperienceService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UserExperienceService,
+        {
+          provide: CacheHelperService,
+          useValue: { getOrSet: jest.fn((_k: string, s: any) => s()), del: jest.fn() },
+        },
         {
           provide: getRepositoryToken(User),
           useValue: {

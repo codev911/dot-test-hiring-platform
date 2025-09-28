@@ -6,6 +6,7 @@ import { UserCertificationService } from '../../src/user-certification/user-cert
 import { UserCertification } from '../../src/entities/user-certification.entity';
 import { User } from '../../src/entities/user.entity';
 import { BucketService } from '../../src/services/bucket.service';
+import { CacheHelperService } from '../../src/utils/cache/cache.service';
 import { Month } from '../../src/utils/enums/month.enum';
 import type { CreateUserCertificationDto } from '../../src/user-certification/dto/create-user-certification.dto';
 import type { UpdateUserCertificationDto } from '../../src/user-certification/dto/update-user-certification.dto';
@@ -71,6 +72,10 @@ describe('UserCertificationService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UserCertificationService,
+        {
+          provide: CacheHelperService,
+          useValue: { getOrSet: jest.fn((_k: string, s: any) => s()), del: jest.fn() },
+        },
         {
           provide: getRepositoryToken(User),
           useValue: {

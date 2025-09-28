@@ -28,6 +28,7 @@ import {
   ApiInternalServerErrorResponse,
 } from '@nestjs/swagger';
 import { UserExperienceService } from './user-experience.service';
+import { CacheTTL } from '@nestjs/cache-manager';
 import { CreateUserExperienceDto } from './dto/create-user-experience.dto';
 import { UpdateUserExperienceDto } from './dto/update-user-experience.dto';
 import {
@@ -90,6 +91,7 @@ export class UserExperienceController {
    * @returns Paginated list of user experiences.
    */
   @Get()
+  @CacheTTL(300_000)
   @ApiOperation({ summary: 'Get paginated list of user experiences' })
   @ApiQuery({
     name: 'page',
@@ -149,6 +151,7 @@ export class UserExperienceController {
    * @returns The requested user experience.
    */
   @Get(':id')
+  @CacheTTL(300_000)
   @ApiOperation({ summary: 'Get a specific user experience by ID' })
   @ApiParam({ name: 'id', description: 'User experience ID' })
   @ApiOkResponse({

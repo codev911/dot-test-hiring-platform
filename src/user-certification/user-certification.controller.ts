@@ -38,6 +38,7 @@ import {
   ApiTooManyRequestsResponse,
 } from '@nestjs/swagger';
 import { UserCertificationService } from './user-certification.service';
+import { CacheTTL } from '@nestjs/cache-manager';
 import { CreateUserCertificationDto } from './dto/create-user-certification.dto';
 import { UpdateUserCertificationDto } from './dto/update-user-certification.dto';
 import { UploadCertificateDto } from './dto/upload-certificate.dto';
@@ -105,6 +106,7 @@ export class UserCertificationController {
    * @returns Paginated list of user certifications.
    */
   @Get()
+  @CacheTTL(300_000)
   @ApiOperation({ summary: 'Get paginated list of user certifications' })
   @ApiQuery({
     name: 'page',
@@ -164,6 +166,7 @@ export class UserCertificationController {
    * @returns The requested user certification.
    */
   @Get(':id')
+  @CacheTTL(300_000)
   @ApiOperation({ summary: 'Get a specific user certification by ID' })
   @ApiParam({ name: 'id', description: 'User certification ID' })
   @ApiOkResponse({

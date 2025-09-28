@@ -36,6 +36,42 @@ export class CacheHelperService {
   }
 
   /**
+   * Remember a list cache key under an index, to later invalidate all paginated entries.
+   */
+  async rememberList<T>(
+    indexKey: string,
+    key: string,
+    supplier: () => Promise<T>,
+    ttlMs?: number,
+  ): Promise<T> {
+    const value = await this.getOrSet<T>(key, supplier, ttlMs);
+    await this.trackKey(indexKey, key);
+    return value;
+  }
+
+  /**
+   * Track an arbitrary cache key under an index key (for HTTP-level keys, for example).
+   */
+  async trackKey(indexKey: string, key: string): Promise<void> {
+    const existing = (await this.cache.get<string[]>(indexKey)) ?? [];
+    if (!existing.includes(key)) {
+      existing.push(key);
+      await this.cache.set(indexKey, existing);
+    }
+  }
+
+  /**
+   * Invalidate all keys previously tracked under the index key, and remove the index.
+   */
+  async invalidateIndex(indexKey: string): Promise<void> {
+    const keys = (await this.cache.get<string[]>(indexKey)) ?? [];
+    if (keys.length > 0) {
+      await Promise.all(keys.map((k) => this.cache.del(k)));
+    }
+    await this.cache.del(indexKey);
+  }
+
+  /**
    * Remove a specific cache key.
    */
   async del(key: string): Promise<void> {

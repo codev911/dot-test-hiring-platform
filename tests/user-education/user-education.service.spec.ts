@@ -4,6 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import type { Repository, DataSource, EntityManager } from 'typeorm';
 import { UserEducationService } from '../../src/user-education/user-education.service';
 import { UserEducation } from '../../src/entities/user-education.entity';
+import { CacheHelperService } from '../../src/utils/cache/cache.service';
 import { User } from '../../src/entities/user.entity';
 import { EducationLevel } from '../../src/utils/enums/education-level.enum';
 import { Month } from '../../src/utils/enums/month.enum';
@@ -55,6 +56,10 @@ describe('UserEducationService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UserEducationService,
+        {
+          provide: CacheHelperService,
+          useValue: { getOrSet: jest.fn((_k: string, s: any) => s()), del: jest.fn() },
+        },
         {
           provide: getRepositoryToken(User),
           useValue: {

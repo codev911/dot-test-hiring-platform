@@ -1,20 +1,20 @@
-import path from 'node:path';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import type { PutObjectCommandInput } from '@aws-sdk/client-s3';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import type { Repository } from 'typeorm';
-import type { DataSource, EntityManager } from 'typeorm';
+import path from 'node:path';
+import type { DataSource, EntityManager, Repository } from 'typeorm';
 import { UserCertification } from '../entities/user-certification.entity';
 import { User } from '../entities/user.entity';
 import { BucketService } from '../services/bucket.service';
+import { CacheHelperService } from '../utils/cache/cache.service';
+import { buildCacheKey, buildHttpCacheKeyForUserPath } from '../utils/cache/cache.util';
+import { withTransaction } from '../utils/database/transaction.util';
+import type {
+  PaginatedUserCertificationsData,
+  UserCertificationData,
+} from '../utils/types/user.type';
 import { CreateUserCertificationDto } from './dto/create-user-certification.dto';
 import { UpdateUserCertificationDto } from './dto/update-user-certification.dto';
-import type {
-  UserCertificationData,
-  PaginatedUserCertificationsData,
-} from '../utils/types/user.type';
-import type { PutObjectCommandInput } from '@aws-sdk/client-s3';
-import { withTransaction } from '../utils/database/transaction.util';
-import { Optional } from '@nestjs/common';
 
 /**
  * Application service that encapsulates user certification management tasks.
@@ -34,6 +34,7 @@ export class UserCertificationService {
     @InjectRepository(UserCertification)
     private readonly userCertificationRepository: Repository<UserCertification>,
     private readonly bucketService: BucketService,
+    private readonly cache: CacheHelperService,
     @Optional() private readonly dataSource?: DataSource,
   ) {}
 
@@ -67,6 +68,15 @@ export class UserCertificationService {
         return repo.save(userCertification);
       },
     );
+
+    // Invalidate all list caches (service-level and HTTP-level)
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'user', 'certification', 'list', userId));
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'user', 'certification', 'list', userId),
+    );
+    // Also clear the base HTTP key (no query params)
+    await this.cache.del(buildHttpCacheKeyForUserPath(userId, '/user/certification'));
+
     return this.mapToUserCertificationData(savedCertification);
   }
 
@@ -79,22 +89,37 @@ export class UserCertificationService {
    * @returns Paginated user certifications data.
    */
   async findAll(userId: string, page = 1, limit = 10): Promise<PaginatedUserCertificationsData> {
-    const [certifications, total] = await this.userCertificationRepository.findAndCount({
-      where: { userId },
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    const key = buildCacheKey('user', 'certification', 'list', userId, page, limit);
+    const indexKey = buildCacheKey('idx', 'user', 'certification', 'list', userId);
+    const httpIndexKey = buildCacheKey('idx', 'http', 'user', 'certification', 'list', userId);
+    const httpKey = buildHttpCacheKeyForUserPath(userId, '/user/certification', { page, limit });
+    const result = await this.cache.rememberList(
+      indexKey,
+      key,
+      async () => {
+        const [certifications, total] = await this.userCertificationRepository.findAndCount({
+          where: { userId },
+          order: { createdAt: 'DESC' },
+          skip: (page - 1) * limit,
+          take: limit,
+        });
 
-    const totalPage = Math.ceil(total / limit);
+        const totalPage = Math.ceil(total / limit);
 
-    return {
-      data: certifications.map((certification) => this.mapToUserCertificationData(certification)),
-      totalData: total,
-      page,
-      limit,
-      totalPage,
-    };
+        return {
+          data: certifications.map((certification) =>
+            this.mapToUserCertificationData(certification),
+          ),
+          totalData: total,
+          page,
+          limit,
+          totalPage,
+        };
+      },
+      300_000,
+    );
+    await this.cache.trackKey(httpIndexKey, httpKey);
+    return result;
   }
 
   /**
@@ -106,15 +131,22 @@ export class UserCertificationService {
    * @throws NotFoundException When the certification cannot be located or doesn't belong to the user.
    */
   async findOne(userId: string, id: string): Promise<UserCertificationData> {
-    const certification = await this.userCertificationRepository.findOne({
-      where: { id, userId },
-    });
+    const key = buildCacheKey('user', 'certification', 'detail', userId, id);
+    return this.cache.getOrSet(
+      key,
+      async () => {
+        const certification = await this.userCertificationRepository.findOne({
+          where: { id, userId },
+        });
 
-    if (!certification) {
-      throw new NotFoundException('User certification not found.');
-    }
+        if (!certification) {
+          throw new NotFoundException('User certification not found.');
+        }
 
-    return this.mapToUserCertificationData(certification);
+        return this.mapToUserCertificationData(certification);
+      },
+      300_000,
+    );
   }
 
   /**
@@ -147,6 +179,16 @@ export class UserCertificationService {
         return repo.save(certification);
       },
     );
+
+    // Invalidate caches
+    await this.cache.del(buildCacheKey('user', 'certification', 'detail', userId, id));
+    await this.cache.del(buildHttpCacheKeyForUserPath(userId, `/user/certification/${id}`));
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'user', 'certification', 'list', userId));
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'user', 'certification', 'list', userId),
+    );
+    // Also clear the base HTTP key (no query params)
+    await this.cache.del(buildHttpCacheKeyForUserPath(userId, '/user/certification'));
 
     return this.mapToUserCertificationData(updatedCertification);
   }
@@ -183,6 +225,16 @@ export class UserCertificationService {
       await repo.remove(certification);
       return undefined;
     });
+
+    // Invalidate caches
+    await this.cache.del(buildCacheKey('user', 'certification', 'detail', userId, id));
+    await this.cache.del(buildHttpCacheKeyForUserPath(userId, `/user/certification/${id}`));
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'user', 'certification', 'list', userId));
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'user', 'certification', 'list', userId),
+    );
+    // Also clear the base HTTP key (no query params)
+    await this.cache.del(buildHttpCacheKeyForUserPath(userId, '/user/certification'));
   }
 
   /**
@@ -207,9 +259,10 @@ export class UserCertificationService {
       throw new NotFoundException('User certification not found.');
     }
 
-    // Generate unique filename with original extension
+    // Generate unique filename with original extension, prefixing with certificationId to prevent replacement
     const fileExtension = path.extname(file.originalname) || '.pdf';
-    const fileName = `${certification.certificationName.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}-${Date.now()}${fileExtension}`;
+    const baseName = certification.certificationName.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+    const fileName = `${certificationId}-${baseName}-${Date.now()}${fileExtension}`;
     const key = path.posix.join('certificate', userId, fileName);
 
     // Delete old certificate file if exists
@@ -239,6 +292,18 @@ export class UserCertificationService {
       await repo.save(certification);
       return undefined;
     });
+
+    // Invalidate caches
+    await this.cache.del(buildCacheKey('user', 'certification', 'detail', userId, certificationId));
+    await this.cache.del(
+      buildHttpCacheKeyForUserPath(userId, `/user/certification/${certificationId}`),
+    );
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'user', 'certification', 'list', userId));
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'user', 'certification', 'list', userId),
+    );
+    // Also clear the base HTTP key (no query params)
+    await this.cache.del(buildHttpCacheKeyForUserPath(userId, '/user/certification'));
 
     return {
       message: 'Certificate uploaded or replaced successfully.',

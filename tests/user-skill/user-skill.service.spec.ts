@@ -5,6 +5,7 @@ import type { Repository } from 'typeorm';
 import { UserSkillService } from '../../src/user-skill/user-skill.service';
 import { UserSkill } from '../../src/entities/user-skill.entity';
 import { User } from '../../src/entities/user.entity';
+import { CacheHelperService } from '../../src/utils/cache/cache.service';
 import { SkillProficiency } from '../../src/utils/enums/skill-proficiency.enum';
 import type { CreateUserSkillDto } from '../../src/user-skill/dto/create-user-skill.dto';
 import type { UpdateUserSkillDto } from '../../src/user-skill/dto/update-user-skill.dto';
@@ -49,6 +50,10 @@ describe('UserSkillService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UserSkillService,
+        {
+          provide: CacheHelperService,
+          useValue: { getOrSet: jest.fn((_k: string, s: any) => s()), del: jest.fn() },
+        },
         {
           provide: getRepositoryToken(User),
           useValue: {

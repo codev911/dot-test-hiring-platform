@@ -9,6 +9,8 @@ import { UpdateUserExperienceDto } from './dto/update-user-experience.dto';
 import type { UserExperienceData, PaginatedUserExperiencesData } from '../utils/types/user.type';
 import { withTransaction } from '../utils/database/transaction.util';
 import { Optional } from '@nestjs/common';
+import { CacheHelperService } from '../utils/cache/cache.service';
+import { buildCacheKey, buildHttpCacheKeyForUserPath } from '../utils/cache/cache.util';
 
 /**
  * Application service that encapsulates user experience management tasks.
@@ -26,6 +28,7 @@ export class UserExperienceService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(UserExperience)
     private readonly userExperienceRepository: Repository<UserExperience>,
+    private readonly cache: CacheHelperService,
     @Optional() private readonly dataSource?: DataSource,
   ) {}
 
@@ -56,6 +59,12 @@ export class UserExperienceService {
       const repo = em ? em.getRepository(UserExperience) : this.userExperienceRepository;
       return repo.save(userExperience);
     });
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'user', 'experience', 'list', userId));
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'user', 'experience', 'list', userId),
+    );
+    // Also clear the base HTTP key (no query params)
+    await this.cache.del(buildHttpCacheKeyForUserPath(userId, '/user/experience'));
     return this.mapToUserExperienceData(savedExperience);
   }
 
@@ -68,22 +77,35 @@ export class UserExperienceService {
    * @returns Paginated user experiences data.
    */
   async findAll(userId: string, page = 1, limit = 10): Promise<PaginatedUserExperiencesData> {
-    const [experiences, total] = await this.userExperienceRepository.findAndCount({
-      where: { userId },
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    const key = buildCacheKey('user', 'experience', 'list', userId, page, limit);
+    const indexKey = buildCacheKey('idx', 'user', 'experience', 'list', userId);
+    const httpIndexKey = buildCacheKey('idx', 'http', 'user', 'experience', 'list', userId);
+    const httpKey = buildHttpCacheKeyForUserPath(userId, '/user/experience', { page, limit });
+    const result = await this.cache.rememberList(
+      indexKey,
+      key,
+      async () => {
+        const [experiences, total] = await this.userExperienceRepository.findAndCount({
+          where: { userId },
+          order: { createdAt: 'DESC' },
+          skip: (page - 1) * limit,
+          take: limit,
+        });
 
-    const totalPage = Math.ceil(total / limit);
+        const totalPage = Math.ceil(total / limit);
 
-    return {
-      data: experiences.map((experience) => this.mapToUserExperienceData(experience)),
-      totalData: total,
-      page,
-      limit,
-      totalPage,
-    };
+        return {
+          data: experiences.map((experience) => this.mapToUserExperienceData(experience)),
+          totalData: total,
+          page,
+          limit,
+          totalPage,
+        };
+      },
+      300_000,
+    );
+    await this.cache.trackKey(httpIndexKey, httpKey);
+    return result;
   }
 
   /**
@@ -95,15 +117,22 @@ export class UserExperienceService {
    * @throws NotFoundException When the experience cannot be located or doesn't belong to the user.
    */
   async findOne(userId: string, id: string): Promise<UserExperienceData> {
-    const experience = await this.userExperienceRepository.findOne({
-      where: { id, userId },
-    });
+    const key = buildCacheKey('user', 'experience', 'detail', userId, id);
+    return this.cache.getOrSet(
+      key,
+      async () => {
+        const experience = await this.userExperienceRepository.findOne({
+          where: { id, userId },
+        });
 
-    if (!experience) {
-      throw new NotFoundException('User experience not found.');
-    }
+        if (!experience) {
+          throw new NotFoundException('User experience not found.');
+        }
 
-    return this.mapToUserExperienceData(experience);
+        return this.mapToUserExperienceData(experience);
+      },
+      300_000,
+    );
   }
 
   /**
@@ -134,6 +163,15 @@ export class UserExperienceService {
       return repo.save(experience);
     });
 
+    await this.cache.del(buildCacheKey('user', 'experience', 'detail', userId, id));
+    await this.cache.del(buildHttpCacheKeyForUserPath(userId, `/user/experience/${id}`));
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'user', 'experience', 'list', userId));
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'user', 'experience', 'list', userId),
+    );
+    // Also clear the base HTTP key (no query params)
+    await this.cache.del(buildHttpCacheKeyForUserPath(userId, '/user/experience'));
+
     return this.mapToUserExperienceData(updatedExperience);
   }
 
@@ -158,6 +196,15 @@ export class UserExperienceService {
       await repo.remove(experience);
       return undefined;
     });
+
+    await this.cache.del(buildCacheKey('user', 'experience', 'detail', userId, id));
+    await this.cache.del(buildHttpCacheKeyForUserPath(userId, `/user/experience/${id}`));
+    await this.cache.invalidateIndex(buildCacheKey('idx', 'user', 'experience', 'list', userId));
+    await this.cache.invalidateIndex(
+      buildCacheKey('idx', 'http', 'user', 'experience', 'list', userId),
+    );
+    // Also clear the base HTTP key (no query params)
+    await this.cache.del(buildHttpCacheKeyForUserPath(userId, '/user/experience'));
   }
 
   /**

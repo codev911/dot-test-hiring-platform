@@ -28,6 +28,7 @@ import {
   ApiInternalServerErrorResponse,
 } from '@nestjs/swagger';
 import { UserSkillService } from './user-skill.service';
+import { CacheTTL } from '@nestjs/cache-manager';
 import { CreateUserSkillDto } from './dto/create-user-skill.dto';
 import { UpdateUserSkillDto } from './dto/update-user-skill.dto';
 import { UserSkillsListResponseDto, UserSkillResponseDto } from './dto/user-skill-response.dto';
@@ -87,6 +88,7 @@ export class UserSkillController {
    * @returns Paginated list of user skills.
    */
   @Get()
+  @CacheTTL(300_000)
   @ApiOperation({ summary: 'Get paginated list of user skills' })
   @ApiQuery({
     name: 'page',
@@ -142,6 +144,7 @@ export class UserSkillController {
    * @returns The requested user skill.
    */
   @Get(':id')
+  @CacheTTL(300_000)
   @ApiOperation({ summary: 'Get a specific user skill by ID' })
   @ApiParam({ name: 'id', description: 'User skill ID' })
   @ApiOkResponse({ description: 'User skill retrieved successfully.', type: UserSkillResponseDto })

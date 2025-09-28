@@ -28,6 +28,7 @@ import {
   ApiTooManyRequestsResponse,
 } from '@nestjs/swagger';
 import { UserEducationService } from './user-education.service';
+import { CacheTTL } from '@nestjs/cache-manager';
 import { CreateUserEducationDto } from './dto/create-user-education.dto';
 import { UpdateUserEducationDto } from './dto/update-user-education.dto';
 import {
@@ -90,6 +91,7 @@ export class UserEducationController {
    * @returns Paginated list of user educations.
    */
   @Get()
+  @CacheTTL(300_000)
   @ApiOperation({ summary: 'Get paginated list of user educations' })
   @ApiQuery({
     name: 'page',
@@ -145,6 +147,7 @@ export class UserEducationController {
    * @returns The requested user education.
    */
   @Get(':id')
+  @CacheTTL(300_000)
   @ApiOperation({ summary: 'Get a specific user education by ID' })
   @ApiParam({ name: 'id', description: 'User education ID' })
   @ApiOkResponse({

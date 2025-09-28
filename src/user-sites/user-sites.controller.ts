@@ -30,6 +30,7 @@ import type { JwtPayload } from '../utils/types/auth.type';
 import { UpsertUserSiteDto } from './dto/upsert-user-site.dto';
 import { UserSiteResponseDto } from './dto/user-site-response.dto';
 import { UserSitesService } from './user-sites.service';
+import { CacheTTL } from '@nestjs/cache-manager';
 
 /**
  * Controller responsible for handling user site-related HTTP requests.
@@ -92,6 +93,7 @@ export class UserSitesController {
    * Get all sites for the current user.
    */
   @Get()
+  @CacheTTL(300_000)
   @ApiOperation({
     summary: 'Get all user sites',
     description: 'Retrieve all sites for the authenticated user.',
@@ -127,6 +129,7 @@ export class UserSitesController {
    * Get a specific site by type for the current user.
    */
   @Get(':siteType')
+  @CacheTTL(300_000)
   @ApiOperation({
     summary: 'Get user site by type',
     description: 'Retrieve a specific site by type for the authenticated user.',

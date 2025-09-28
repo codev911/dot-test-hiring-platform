@@ -1,14 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import type { Repository } from 'typeorm';
-import type { DataSource, EntityManager } from 'typeorm';
+import type { DataSource, EntityManager, Repository } from 'typeorm';
 import { UserSkill } from '../entities/user-skill.entity';
 import { User } from '../entities/user.entity';
+import { CacheHelperService } from '../utils/cache/cache.service';
+import { buildCacheKey, buildHttpCacheKeyForUserPath } from '../utils/cache/cache.util';
+import { withTransaction } from '../utils/database/transaction.util';
+import type { PaginatedUserSkillsData, UserSkillData } from '../utils/types/user.type';
 import { CreateUserSkillDto } from './dto/create-user-skill.dto';
 import { UpdateUserSkillDto } from './dto/update-user-skill.dto';
-import type { UserSkillData, PaginatedUserSkillsData } from '../utils/types/user.type';
-import { withTransaction } from '../utils/database/transaction.util';
-import { Optional } from '@nestjs/common';
 
 /**
  * Application service that encapsulates user skill management tasks.
@@ -26,6 +26,7 @@ export class UserSkillService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(UserSkill)
     private readonly userSkillRepository: Repository<UserSkill>,
+    private readonly cache: CacheHelperService,
     @Optional() private readonly dataSource?: DataSource,
   ) {}
 
@@ -53,6 +54,10 @@ export class UserSkillService {
       const repo = em ? em.getRepository(UserSkill) : this.userSkillRepository;
       return repo.save(userSkill);
     });
+    await this.cache.invalidateIndex(buildCacheKey('idx','user','skill','list', userId));
+    await this.cache.invalidateIndex(buildCacheKey('idx','http','user','skill','list', userId));
+    // Also clear the base HTTP key (no query params), which might have been cached prior to index tracking
+    await this.cache.del(buildHttpCacheKeyForUserPath(userId, '/user/skill'));
     return this.mapToUserSkillData(savedSkill);
   }
 
@@ -65,22 +70,35 @@ export class UserSkillService {
    * @returns Paginated user skills data.
    */
   async findAll(userId: string, page = 1, limit = 10): Promise<PaginatedUserSkillsData> {
-    const [skills, total] = await this.userSkillRepository.findAndCount({
-      where: { userId },
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    const key = buildCacheKey('user', 'skill', 'list', userId, page, limit);
+    const indexKey = buildCacheKey('idx', 'user', 'skill', 'list', userId);
+    const httpIndexKey = buildCacheKey('idx', 'http', 'user', 'skill', 'list', userId);
+    const httpKey = buildHttpCacheKeyForUserPath(userId, '/user/skill', { page, limit });
+    const result = await this.cache.rememberList(
+      indexKey,
+      key,
+      async () => {
+        const [skills, total] = await this.userSkillRepository.findAndCount({
+          where: { userId },
+          order: { createdAt: 'DESC' },
+          skip: (page - 1) * limit,
+          take: limit,
+        });
 
-    const totalPage = Math.ceil(total / limit);
+        const totalPage = Math.ceil(total / limit);
 
-    return {
-      data: skills.map((skill) => this.mapToUserSkillData(skill)),
-      totalData: total,
-      page,
-      limit,
-      totalPage,
-    };
+        return {
+          data: skills.map((skill) => this.mapToUserSkillData(skill)),
+          totalData: total,
+          page,
+          limit,
+          totalPage,
+        };
+      },
+      300_000,
+    );
+    await this.cache.trackKey(httpIndexKey, httpKey);
+    return result;
   }
 
   /**
@@ -92,15 +110,22 @@ export class UserSkillService {
    * @throws NotFoundException When the skill cannot be located or doesn't belong to the user.
    */
   async findOne(userId: string, id: string): Promise<UserSkillData> {
-    const skill = await this.userSkillRepository.findOne({
-      where: { id, userId },
-    });
+    const key = buildCacheKey('user', 'skill', 'detail', userId, id);
+    return this.cache.getOrSet(
+      key,
+      async () => {
+        const skill = await this.userSkillRepository.findOne({
+          where: { id, userId },
+        });
 
-    if (!skill) {
-      throw new NotFoundException('User skill not found.');
-    }
+        if (!skill) {
+          throw new NotFoundException('User skill not found.');
+        }
 
-    return this.mapToUserSkillData(skill);
+        return this.mapToUserSkillData(skill);
+      },
+      300_000,
+    );
   }
 
   /**
@@ -131,6 +156,13 @@ export class UserSkillService {
       return repo.save(skill);
     });
 
+    await this.cache.del(buildCacheKey('user', 'skill', 'detail', userId, id));
+    await this.cache.del(buildHttpCacheKeyForUserPath(userId, `/user/skill/${id}`));
+    await this.cache.invalidateIndex(buildCacheKey('idx','user','skill','list', userId));
+    await this.cache.invalidateIndex(buildCacheKey('idx','http','user','skill','list', userId));
+    // Also clear the base HTTP key (no query params)
+    await this.cache.del(buildHttpCacheKeyForUserPath(userId, '/user/skill'));
+
     return this.mapToUserSkillData(updatedSkill);
   }
 
@@ -155,6 +187,13 @@ export class UserSkillService {
       await repo.remove(skill);
       return undefined;
     });
+
+    await this.cache.del(buildCacheKey('user', 'skill', 'detail', userId, id));
+    await this.cache.del(buildHttpCacheKeyForUserPath(userId, `/user/skill/${id}`));
+    await this.cache.invalidateIndex(buildCacheKey('idx','user','skill','list', userId));
+    await this.cache.invalidateIndex(buildCacheKey('idx','http','user','skill','list', userId));
+    // Also clear the base HTTP key (no query params)
+    await this.cache.del(buildHttpCacheKeyForUserPath(userId, '/user/skill'));
   }
 
   /**

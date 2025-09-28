@@ -10,6 +10,8 @@ import { withTransaction } from '../utils/database/transaction.util';
 import { Optional } from '@nestjs/common';
 import type { UserResumeData } from '../utils/types/user.type';
 import type { PutObjectCommandInput } from '@aws-sdk/client-s3';
+import { CacheHelperService } from '../utils/cache/cache.service';
+import { buildCacheKey, buildHttpCacheKeyForUserPath } from '../utils/cache/cache.util';
 
 /**
  * Application service that encapsulates user resume management tasks.
@@ -29,6 +31,7 @@ export class UserResumeService {
     @InjectRepository(UserResume)
     private readonly userResumeRepository: Repository<UserResume>,
     private readonly bucketService: BucketService,
+    private readonly cache: CacheHelperService,
     @Optional() private readonly dataSource?: DataSource,
   ) {}
 
@@ -40,22 +43,30 @@ export class UserResumeService {
    * @throws NotFoundException When the user cannot be located.
    */
   async getResume(userId: string): Promise<{ message: string; data: UserResumeData }> {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
+    const key = buildCacheKey('user', 'resume', userId);
 
-    if (!user) {
-      throw new NotFoundException('User not found.');
-    }
+    return this.cache.getOrSet(
+      key,
+      async () => {
+        const user = await this.userRepository.findOne({ where: { id: userId } });
 
-    const userResume = await this.userResumeRepository.findOne({ where: { userId } });
+        if (!user) {
+          throw new NotFoundException('User not found.');
+        }
 
-    return {
-      message: 'Resume retrieved successfully.',
-      data: {
-        resumeUrl: userResume
-          ? String(this.bucketService.getPublicUrl(userResume.resumePath))
-          : null,
+        const userResume = await this.userResumeRepository.findOne({ where: { userId } });
+
+        return {
+          message: 'Resume retrieved successfully.',
+          data: {
+            resumeUrl: userResume
+              ? String(this.bucketService.getPublicUrl(userResume.resumePath))
+              : null,
+          },
+        };
       },
-    };
+      300_000, // 5 minutes TTL
+    );
   }
 
   /**
@@ -96,6 +107,10 @@ export class UserResumeService {
       await repo.save(record);
       return undefined;
     });
+
+    // Invalidate caches (service-level and HTTP-level)
+    await this.cache.del(buildCacheKey('user', 'resume', userId));
+    await this.cache.del(buildHttpCacheKeyForUserPath(userId, '/user/resume'));
 
     return {
       message: 'Resume uploaded successfully.',

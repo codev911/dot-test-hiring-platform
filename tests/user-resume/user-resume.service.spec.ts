@@ -50,7 +50,11 @@ describe('UserResumeService', () => {
       getPublicUrl: jest.fn().mockReturnValue('http://localhost:9000/bucket/resume/user-1.pdf'),
     } as unknown as jest.Mocked<BucketService>;
 
-    service = new UserResumeService(userRepository, userResumeRepository, bucketService);
+    const cache = {
+      getOrSet: jest.fn((_k: string, supplier: any) => supplier()),
+      del: jest.fn(),
+    } as any;
+    service = new UserResumeService(userRepository, userResumeRepository, bucketService, cache);
   });
 
   afterEach(() => {

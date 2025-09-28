@@ -44,7 +44,13 @@ describe('UserService', () => {
       getPublicUrl: jest.fn().mockReturnValue('http://localhost:9000/bucket/profile/user-1.png'),
     } as unknown as jest.Mocked<BucketService>;
 
-    service = new UserService(userRepository, bucketService);
+    // Provide a simple cache helper stub
+    const cache = {
+      getOrSet: jest.fn((_k: string, supplier: any) => supplier()),
+      del: jest.fn(),
+    } as any;
+
+    service = new UserService(userRepository, bucketService, cache);
   });
 
   afterEach(() => {

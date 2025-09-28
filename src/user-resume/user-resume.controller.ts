@@ -29,6 +29,7 @@ import {
   ApiTooManyRequestsResponse,
 } from '@nestjs/swagger';
 import { UserResumeService } from './user-resume.service';
+import { CacheTTL } from '@nestjs/cache-manager';
 import { UploadResumeDto } from './dto/upload-resume.dto';
 import { ResumeResponseDto } from './dto/resume-response.dto';
 import { CandidateAuthGuard } from '../common/guards/candidate-auth.guard';
@@ -54,6 +55,7 @@ export class UserResumeController {
    * @returns Response containing the resume URL or null if no resume uploaded.
    */
   @Get()
+  @CacheTTL(300_000)
   @ApiOperation({ summary: 'Get user resume URL' })
   @ApiOkResponse({ description: 'Resume retrieved successfully.', type: ResumeResponseDto })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing token.' })

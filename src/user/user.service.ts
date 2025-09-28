@@ -16,6 +16,8 @@ import { HashingService } from '../services/hashing.service';
 import type { PutObjectCommandInput } from '@aws-sdk/client-s3';
 import { withTransaction } from '../utils/database/transaction.util';
 import { Optional } from '@nestjs/common';
+import { CacheHelperService } from '../utils/cache/cache.service';
+import { buildCacheKey, buildHttpCacheKeyForUserPath } from '../utils/cache/cache.util';
 
 /**
  * Application service that encapsulates user profile management tasks.
@@ -32,6 +34,7 @@ export class UserService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly bucketService: BucketService,
+    private readonly cache: CacheHelperService,
     @Optional() private readonly dataSource?: DataSource,
   ) {}
 
@@ -72,6 +75,10 @@ export class UserService {
       await repo.save(user);
       return undefined;
     });
+
+    // Invalidate caches (service-level and HTTP-level) after password change
+    await this.cache.del(buildCacheKey('user', 'avatar', userId));
+    await this.cache.del(buildHttpCacheKeyForUserPath(userId, '/user/avatar'));
 
     return {
       message: 'Password updated successfully.',
@@ -118,6 +125,10 @@ export class UserService {
       return undefined;
     });
 
+    // Invalidate caches (service-level and HTTP-level)
+    await this.cache.del(buildCacheKey('user', 'avatar', userId));
+    await this.cache.del(buildHttpCacheKeyForUserPath(userId, '/user/avatar'));
+
     return {
       message: 'Avatar updated successfully.',
       data: {
@@ -134,22 +145,30 @@ export class UserService {
    * @throws NotFoundException When the user cannot be located.
    */
   async getAvatar(userId: string): Promise<{ message: string; data: UserAvatarData }> {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
+    const key = buildCacheKey('user', 'avatar', userId);
 
-    if (!user) {
-      throw new NotFoundException('User not found.');
-    }
+    return this.cache.getOrSet(
+      key,
+      async () => {
+        const user = await this.userRepository.findOne({ where: { id: userId } });
 
-    const url: string | null = user.avatarPath
-      ? String(this.bucketService.getPublicUrl(user.avatarPath))
-      : null;
+        if (!user) {
+          throw new NotFoundException('User not found.');
+        }
 
-    return {
-      message: 'Avatar retrieved successfully.',
-      data: {
-        avatarUrl: url,
+        const url: string | null = user.avatarPath
+          ? String(this.bucketService.getPublicUrl(user.avatarPath))
+          : null;
+
+        return {
+          message: 'Avatar retrieved successfully.',
+          data: {
+            avatarUrl: url,
+          },
+        };
       },
-    };
+      300_000, // 5 minutes TTL for avatar data
+    );
   }
 
   /**

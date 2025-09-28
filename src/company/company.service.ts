@@ -1,6 +1,4 @@
 import { ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common';
-import { CacheHelperService } from '../utils/cache/cache.service';
-import { buildCacheKey } from '../utils/cache/cache.util';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
 import type { DataSource, EntityManager } from 'typeorm';
@@ -12,6 +10,8 @@ import type { UpdateCompanyDto } from './dto/update-company.dto';
 import type { CreateRecruiterDto } from './dto/create-recruiter.dto';
 import { RecuiterLevel } from '../utils/enums/recuiter-level.enum';
 import { withTransaction } from '../utils/database/transaction.util';
+import { CacheHelperService } from '../utils/cache/cache.service';
+import { buildCacheKey, buildHttpCacheKeyForUserPath } from '../utils/cache/cache.util';
 
 /**
  * Business logic for company operations.
@@ -78,8 +78,9 @@ export class CompanyService {
       return repo.save(company);
     });
 
-    // invalidate cached public company data
+    // invalidate cached public company data (service-level and HTTP-level)
     await this.cache.del(buildCacheKey('company', 'static'));
+    await this.cache.del(buildHttpCacheKeyForUserPath(undefined, '/company'));
 
     return this.toCompanyData(saved);
   }
@@ -128,6 +129,10 @@ export class CompanyService {
         return { savedUser: u, savedMapping: m };
       },
     );
+
+    // optional: invalidate company cache in case public info reflects recruiter counts in future
+    await this.cache.del(buildCacheKey('company', 'static'));
+    await this.cache.del(buildHttpCacheKeyForUserPath(undefined, '/company'));
 
     return {
       userId: savedUser.id,

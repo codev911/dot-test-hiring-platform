@@ -72,7 +72,6 @@ export class JobPostingService {
   ): Promise<JobPostingData> {
     const recruiterMapping = await this.companyRecruiterRepository.findOne({
       where: { id: companyRecruiterId },
-      relations: ['company'],
     });
 
     if (!recruiterMapping) {
@@ -613,10 +612,13 @@ export class JobPostingService {
    * @returns JobPostingData projection.
    */
   private toJobPostingData(entity: JobPosting): JobPostingData {
+    const companyId = entity.company?.id ?? entity.companyId;
+    const recruiterId = entity.recruiter?.id ?? entity.recruiterId;
+
     return {
       id: entity.id,
-      companyId: entity.companyId,
-      recruiterId: entity.recruiterId,
+      companyId,
+      recruiterId,
       title: entity.title,
       slug: entity.slug,
       description: entity.description,

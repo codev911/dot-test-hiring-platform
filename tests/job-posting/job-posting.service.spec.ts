@@ -142,7 +142,6 @@ describe('JobPostingService', () => {
       const result = await service.createJobPosting(mockRecruiterId, dto);
       expect(recruiterRepo.findOne).toHaveBeenCalledWith({
         where: { id: mockRecruiterId },
-        relations: ['company'],
       });
       expect(result.title).toBe('Senior Engineer');
       expect(result.slug).toContain('senior-engineer');

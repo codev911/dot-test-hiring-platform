@@ -2,6 +2,7 @@ import helmet from 'helmet';
 import { SwaggerModule, DocumentBuilder, type OpenAPIObject } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { NodeEnv } from './utils/enums/node-env.enum';
 import type { Env } from './utils/types/env.type';
@@ -26,6 +27,18 @@ async function bootstrap(): Promise<void> {
   // get config env
   const configService = app.get<ConfigService<Env>>(ConfigService);
   const { PORT, NODE_ENV } = collectEnv(configService);
+
+  // register global validation pipeline to enforce DTO constraints application wide
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+      transformOptions: {
+        enableImplicitConversion: true,
+      },
+    }),
+  );
 
   // ensure bucket availability
   const bucketService = app.get(BucketService);
